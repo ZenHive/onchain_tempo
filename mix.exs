@@ -43,6 +43,9 @@ defmodule OnchainTempo.MixProject do
       {:jason, "~> 1.4"},
       {:descripex, "~> 0.4"},
 
+      # Req.Test needs plug for test stubs; tidewave needs it in dev
+      {:plug, "~> 1.16", only: [:dev, :test]},
+
       # Dev/test tooling
       {:tidewave, "~> 0.5", only: :dev},
       {:bandit, "~> 1.0", only: :dev},
@@ -91,7 +94,8 @@ defmodule OnchainTempo.MixProject do
     [
       plt_add_apps: [:mix],
       plt_local_path: "_build/dialyzer",
-      plt_core_path: "_build/dialyzer"
+      plt_core_path: "_build/dialyzer",
+      ignore_warnings: ".dialyzer_ignore.exs"
     ]
   end
 end
