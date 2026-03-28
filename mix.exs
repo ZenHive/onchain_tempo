@@ -38,7 +38,7 @@ defmodule OnchainTempo.MixProject do
 
   defp deps do
     [
-      {:onchain, path: "../onchain"},
+      {:onchain, "~> 0.4"},
       {:req, "~> 0.5"},
       {:jason, "~> 1.4"},
       {:descripex, "~> 0.4"},
@@ -67,7 +67,8 @@ defmodule OnchainTempo.MixProject do
   defp package do
     [
       licenses: ["MIT"],
-      links: %{"GitHub" => @source_url}
+      links: %{"GitHub" => @source_url},
+      files: ~w(lib .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
     ]
   end
 
