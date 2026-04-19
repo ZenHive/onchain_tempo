@@ -32,7 +32,8 @@ defmodule Onchain.Tempo.Transaction.Builder do
 
   # Default gas parameters for testnet transfers.
   # Moderato base fee is 20 gwei minimum — use 25 gwei for headroom.
-  @default_gas_limit 200_000
+  # 500k covers a stock TIP-20 transfer (~272k on Moderato) with margin.
+  @default_gas_limit 500_000
   @default_max_fee_per_gas 25_000_000_000
   @default_max_priority_fee_per_gas 1_000_000_000
 

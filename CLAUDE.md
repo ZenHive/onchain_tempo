@@ -75,7 +75,7 @@ Dialyzer shows `unknown_function` warnings for transitive deps when using onchai
 
 - Styler is the formatter plugin (runs automatically via `mix format`)
 - `test/support/` is compiled in test env
-- Integration tests tagged `:integration`, excluded by default
+- Integration tests live under `test/onchain/tempo/integration/`, tagged `:integration`, excluded by default. They self-fund fresh wallets via the Moderato `tempo_fundAddress` faucet RPC — no env var required. Override the endpoint with `TEMPO_RPC_URL`.
 - All calldata functions accept raw binaries (20-byte addresses, 32-byte memos), not hex strings
 - Error format: `{:ok, result} | {:error, String.t()}`
 
