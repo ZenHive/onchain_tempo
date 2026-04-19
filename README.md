@@ -1,18 +1,23 @@
 # OnchainTempo
 
+[![Hex.pm](https://img.shields.io/hexpm/v/onchain_tempo.svg)](https://hex.pm/packages/onchain_tempo)
+[![HexDocs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/onchain_tempo)
+
 Tempo blockchain primitives for Elixir — 0x76 transaction handling, TIP-20 token encoding, RPC broadcasting, and TransferWithMemo event parsing.
 
-Built on [onchain](https://github.com/ZenHive/onchain).
+Built on [onchain](https://hex.pm/packages/onchain).
 
 ## Installation
 
 ```elixir
 def deps do
   [
-    {:onchain_tempo, "~> 0.1"}
+    {:onchain_tempo, "~> 0.2"}
   ]
 end
 ```
+
+Documentation: [hexdocs.pm/onchain_tempo](https://hexdocs.pm/onchain_tempo).
 
 ## Modules
 

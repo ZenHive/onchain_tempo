@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## v0.2.0
+
 ### Public `Onchain.Tempo.Faucet` helper for `tempo_fundAddress`
 
 **Completed** 2026-04-19 | [D:2/B:5/U:5 → Eff:2.5]

@@ -39,7 +39,7 @@
       opts keyword list (`:rpc_url`, `:req_options`, `:settle_ms`); the
       `:settle_ms` option lets unit tests skip the post-funding sleep. Old test
       support helper deleted; integration suite migrated to the public module.
-      See [CHANGELOG.md](CHANGELOG.md#unreleased).
+      See [CHANGELOG.md](CHANGELOG.md#v020).
 
 - [ ] Task 6: Replace Faucet fixed-sleep settle with poll loop [D:3/B:3/U:3 → Eff:1.0] 📋
       `Onchain.Tempo.Faucet.fresh_funded_wallet/2` currently sleeps a fixed
