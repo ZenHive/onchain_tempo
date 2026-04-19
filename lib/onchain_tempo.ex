@@ -19,6 +19,7 @@ defmodule OnchainTempo do
       Onchain.Tempo.Transaction,
       Onchain.Tempo.Transaction.Builder,
       Onchain.Tempo.RPC,
-      Onchain.Tempo.Transfer
+      Onchain.Tempo.Transfer,
+      Onchain.Tempo.Faucet
     ]
 end

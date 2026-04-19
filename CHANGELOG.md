@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Public `Onchain.Tempo.Faucet` helper for `tempo_fundAddress`
+
+**Completed** 2026-04-19 | [D:2/B:5/U:5 → Eff:2.5]
+
+**What was done:**
+- Promoted the previously test-only `Onchain.Tempo.TestSupport.ModeratoFaucet` (`test/support/moderato_faucet.ex`) into public `Onchain.Tempo.Faucet` at `lib/onchain/tempo/faucet.ex` so downstream consumers writing their own integration suites can reuse the Moderato faucet recipe without copying it from our test code.
+- Public API: `rpc_url/0` (Moderato default, `TEMPO_RPC_URL` override), `fund_address/2` (thin wrapper around the `tempo_fundAddress` JSON-RPC, returns `{:ok, [tx_hash]}`), and `fresh_funded_wallet/1` (generates a 32-byte keypair, funds it, sleeps for settlement). Both accept an opts keyword list with `:rpc_url`, `:req_options`, and (for `fresh_funded_wallet/1`) `:settle_ms`.
+- Registered `Onchain.Tempo.Faucet` in `OnchainTempo`'s `Descripex.Discoverable` module list so it surfaces in `OnchainTempo.describe/0`.
+- Migrated the integration suite (`test/onchain/tempo/integration/moderato_test.exs`) to the public module and deleted the old `test/support/moderato_faucet.ex`.
+- Added unit tests at `test/onchain/tempo/faucet_test.exs` covering happy/error/transport paths via `Req.Test` stubs.
+
+**Key decisions:**
+- Kept the wrapper thin — same `{:ok, _} | {:error, String.t()}` contract as the rest of the library, no struct for the wallet (single-shot return value, kept as a plain map to match the original API).
+- Single opts keyword list (rather than `(address, rpc_url, opts)` positional) so callers like `fund_address("0xabc", req_options: [...])` don't silently bind the keyword list to `rpc_url`. RPC URL is pulled with `Keyword.pop(opts, :rpc_url, rpc_url())`.
+- `fresh_funded_wallet/1` accepts a `:settle_ms` option (defaults to `2_500`) so unit tests can pass `settle_ms: 0` and avoid the real-world post-funding sleep.
+- HTTP path closely follows `Onchain.Tempo.RPC.rpc_request/4` — same `Req.request/2` two-list shape, `Jason.encode!` with string keys, and `req_options` pass-through for `Req.Test`; adds `receive_timeout: 15_000` since funding occasionally exceeds the default.
+- Carried forward the existing TODO about the fixed-sleep settle, retagged as `TODO(Task 6):` with a matching ROADMAP entry to replace it with a poll loop on `eth_getTransactionCount`/`eth_getBalance`.
+
 ## v0.1.1
 
 ### Integration tests against Moderato testnet

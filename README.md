@@ -23,6 +23,7 @@ end
 | `Onchain.Tempo.Transaction.Builder` | Build and sign 0x76 transactions from scratch |
 | `Onchain.Tempo.RPC` | Tempo JSON-RPC operations (broadcast async/sync, fetch receipt) |
 | `Onchain.Tempo.Transfer` | TransferWithMemo event log parsing |
+| `Onchain.Tempo.Faucet` | Moderato testnet faucet — `tempo_fundAddress` wrapper (testing only) |
 
 ## Quick Start
 
@@ -66,6 +67,24 @@ match.amount  #=> 1000000
 # Sync (waits for block inclusion, returns receipt)
 {:ok, tx_hash, receipt} = Onchain.Tempo.RPC.broadcast_sync(tx_hex, rpc_url)
 ```
+
+### Fund a Moderato testnet wallet
+
+For integration tests against Moderato (testnet `42_431`), `Onchain.Tempo.Faucet`
+wraps the non-standard `tempo_fundAddress` JSON-RPC:
+
+```elixir
+# Fund an existing address.
+{:ok, [tx_hash | _]} = Onchain.Tempo.Faucet.fund_address("0xabc...")
+
+# Generate + fund a fresh keypair (waits for settlement before returning).
+{:ok, %{private_key: priv, address_hex: hex, address_bin: bin}} =
+  Onchain.Tempo.Faucet.fresh_funded_wallet()
+```
+
+Defaults to `https://rpc.moderato.tempo.xyz`; overridable via `TEMPO_RPC_URL`
+or by passing `rpc_url:` in the opts (e.g. `fund_address("0xabc...", rpc_url:
+"https://my-mirror")`). Mainnet does not support `tempo_fundAddress`.
 
 ## Discovery
 

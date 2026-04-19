@@ -33,10 +33,19 @@
 
 ## Phase 3: Future Work
 
-- [ ] Public Onchain.Tempo.Faucet helper for tempo_fundAddress [D:2/B:5/U:5 → Eff:2.5] 🚀
-      Moderato exposes a `tempo_fundAddress` custom JSON-RPC that funds an address
-      with native + pathUSD. Currently only used internally by the integration test
-      suite (`test/support/moderato_faucet.ex`). Promote a thin public wrapper to
-      `lib/onchain/tempo/faucet.ex` so consumers writing their own integration
-      suites don't have to re-derive the recipe. Discovered during the v0.1.1
-      integration test work — recipe sourced from MPP's existing tempo integration tests.
+- [x] Public Onchain.Tempo.Faucet helper for tempo_fundAddress [D:2/B:5/U:5 → Eff:2.5] ✅
+      Promoted `test/support/moderato_faucet.ex` to public `Onchain.Tempo.Faucet`
+      with `rpc_url/0`, `fund_address/2`, and `fresh_funded_wallet/1`. Single
+      opts keyword list (`:rpc_url`, `:req_options`, `:settle_ms`); the
+      `:settle_ms` option lets unit tests skip the post-funding sleep. Old test
+      support helper deleted; integration suite migrated to the public module.
+      See [CHANGELOG.md](CHANGELOG.md#unreleased).
+
+- [ ] Task 6: Replace Faucet fixed-sleep settle with poll loop [D:3/B:3/U:3 → Eff:1.0] 📋
+      `Onchain.Tempo.Faucet.fresh_funded_wallet/2` currently sleeps a fixed
+      `@default_settle_ms` (2_500ms) after funding before returning. Replace
+      with a poll loop on `eth_getTransactionCount` or `eth_getBalance` so the
+      helper returns as soon as the funding transaction lands (Moderato blocks
+      ~500ms; the fixed sleep wastes ~2s per integration test). Discovered
+      during the v0.1.1 integration test work and carried forward when the
+      helper was promoted to a public module.

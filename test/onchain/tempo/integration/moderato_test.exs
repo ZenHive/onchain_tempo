@@ -2,8 +2,8 @@ defmodule Onchain.Tempo.Integration.ModeratoTest do
   @moduledoc false
   use ExUnit.Case, async: false
 
+  alias Onchain.Tempo.Faucet
   alias Onchain.Tempo.RPC
-  alias Onchain.Tempo.TestSupport.ModeratoFaucet
   alias Onchain.Tempo.Transaction
   alias Onchain.Tempo.Transaction.Builder
 
@@ -14,9 +14,9 @@ defmodule Onchain.Tempo.Integration.ModeratoTest do
   @chain_id 42_431
 
   setup do
-    case ModeratoFaucet.fresh_funded_wallet() do
+    case Faucet.fresh_funded_wallet() do
       {:ok, wallet} ->
-        {:ok, wallet: wallet, rpc_url: ModeratoFaucet.rpc_url()}
+        {:ok, wallet: wallet, rpc_url: Faucet.rpc_url()}
 
       {:error, reason} ->
         flunk("""

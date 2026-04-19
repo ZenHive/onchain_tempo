@@ -43,6 +43,7 @@ Onchain.Tempo.Transaction          — 0x76 struct, deserialize, payment matchin
 Onchain.Tempo.Transaction.Builder  — Build + sign 0x76 transactions from scratch
 Onchain.Tempo.RPC                  — broadcast_async/sync, fetch_receipt, parse_receipt
 Onchain.Tempo.Transfer             — TransferWithMemo event log parsing
+Onchain.Tempo.Faucet               — Moderato testnet faucet (tempo_fundAddress) wrapper
 ```
 
 ### Key Design Decisions
