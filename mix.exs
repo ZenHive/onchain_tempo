@@ -38,10 +38,10 @@ defmodule OnchainTempo.MixProject do
 
   defp deps do
     [
-      {:onchain, "~> 0.4"},
+      {:onchain, "~> 0.5"},
       {:req, "~> 0.5"},
       {:jason, "~> 1.4"},
-      {:descripex, "~> 0.4"},
+      {:descripex, "~> 0.6"},
 
       # Req.Test needs plug for test stubs; tidewave needs it in dev
       {:plug, "~> 1.16", only: [:dev, :test]},

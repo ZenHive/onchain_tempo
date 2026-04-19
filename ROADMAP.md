@@ -22,5 +22,8 @@
       Add integration tests for Builder (real nonce fetch) and RPC (real broadcast/receipt).
       Requires TEMPO_PRIVATE_KEY env var.
 
-- [ ] Update MPP to use onchain_tempo [D:3/B:8/U:9 → Eff:2.83]
-      Replace MPP.Tempo.Transaction with Onchain.Tempo.Transaction, remove extracted code from MPP.
+- [x] Update MPP to use onchain_tempo [D:3/B:8/U:9 → Eff:2.83] ✅
+      Already complete — MPP migrated during the original v0.1.0 extraction (2026-03-28).
+      Confirmed 2026-04-19: `mpp/lib/mpp/methods/tempo.ex` aliases `Onchain.Tempo.{RPC, Transaction, Transfer}`,
+      `mpp/mix.exs` declares `{:onchain_tempo, "~> 0.1"}`, no `MPP.Tempo.Transaction` module exists.
+      See [CHANGELOG.md](CHANGELOG.md#unreleased).

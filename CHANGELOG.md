@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Task: Update MPP to use onchain_tempo
+
+**Completed** 2026-04-19 | [D:3/B:8/U:9 → Eff:2.83]
+
+**What was done:**
+- Bookkeeping closure — verified the MPP-side migration was already accomplished during the original v0.1.0 extraction (MPP Task 23, 2026-03-28).
+- `MPP.Methods.Tempo` aliases `Onchain.Tempo.{RPC, Transaction, Transfer}`; no `MPP.Tempo.Transaction` module remains in `mpp/lib/`.
+- Remaining `MPP.Tempo.*` modules (`Store`, `ConCacheStore`, `Methods.Tempo.SessionReceipt`) are MPP-specific concerns (HTTP 402 dedup, session receipt encoding) and intentionally stay in MPP.
+
+**Key decisions:**
+- No code changes in either repo. The migration was complete; T2 was a stale roadmap entry.
+- Forward-looking: when onchain_tempo v0.2.0 ships with bumped `onchain` / `descripex`, MPP will need a coordinated dep bump — tracked as MPP Task 43.
+
 ## v0.1.0
 
 Initial release — extracted Tempo blockchain primitives from MPP.
