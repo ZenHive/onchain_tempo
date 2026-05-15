@@ -86,23 +86,42 @@ defmodule Onchain.Tempo.Faucet do
           {:ok, %{private_key: binary(), address_hex: String.t(), address_bin: binary()}}
           | {:error, String.t()}
   def fresh_funded_wallet(opts \\ []) do
-    priv = :crypto.strong_rand_bytes(32)
-    {:ok, addr_hex} = Onchain.Signer.address_from_key(priv)
-    addr_bin = addr_hex |> String.trim_leading("0x") |> Base.decode16!(case: :mixed)
+    with :ok <- validate_wait_opts(opts) do
+      priv = :crypto.strong_rand_bytes(32)
+      {:ok, addr_hex} = Onchain.Signer.address_from_key(priv)
+      addr_bin = addr_hex |> String.trim_leading("0x") |> Base.decode16!(case: :mixed)
 
-    with {:ok, _hashes} <- fund_address(addr_hex, opts),
-         :ok <- wait_for_funding(addr_hex, opts) do
-      {:ok, %{private_key: priv, address_hex: addr_hex, address_bin: addr_bin}}
+      with {:ok, _hashes} <- fund_address(addr_hex, opts),
+           :ok <- wait_for_funding(addr_hex, opts) do
+        {:ok, %{private_key: priv, address_hex: addr_hex, address_bin: addr_bin}}
+      end
     end
   end
 
   # --- Private ---
 
+  @spec validate_wait_opts(keyword()) :: :ok | {:error, String.t()}
+  defp validate_wait_opts(opts) do
+    timeout_ms = Keyword.get(opts, :settle_ms, @default_wait_timeout_ms)
+    interval_ms = Keyword.get(opts, :poll_interval_ms, @default_poll_interval_ms)
+
+    cond do
+      not (is_integer(timeout_ms) and timeout_ms >= 0) ->
+        {:error, ":settle_ms must be a non-negative integer, got: #{inspect(timeout_ms)}"}
+
+      timeout_ms > 0 and not (is_integer(interval_ms) and interval_ms > 0) ->
+        {:error, ":poll_interval_ms must be a positive integer, got: #{inspect(interval_ms)}"}
+
+      true ->
+        :ok
+    end
+  end
+
   @spec wait_for_funding(String.t(), keyword()) :: :ok | {:error, String.t()}
   defp wait_for_funding(addr_hex, opts) do
     timeout_ms = Keyword.get(opts, :settle_ms, @default_wait_timeout_ms)
 
-    if timeout_ms <= 0 do
+    if timeout_ms == 0 do
       :ok
     else
       interval_ms = Keyword.get(opts, :poll_interval_ms, @default_poll_interval_ms)

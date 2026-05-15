@@ -199,5 +199,47 @@ defmodule Onchain.Tempo.FaucetTest do
 
       assert msg =~ "timeout"
     end
+
+    test "rejects negative :settle_ms with actionable error (fails fast, no RPC)" do
+      assert {:error, msg} = Faucet.fresh_funded_wallet(settle_ms: -1)
+      assert msg =~ ":settle_ms must be a non-negative integer"
+      assert msg =~ "-1"
+    end
+
+    test "rejects non-integer :settle_ms with actionable error" do
+      assert {:error, msg} = Faucet.fresh_funded_wallet(settle_ms: "2500")
+      assert msg =~ ":settle_ms must be a non-negative integer"
+    end
+
+    test "rejects non-positive :poll_interval_ms with actionable error" do
+      assert {:error, msg} =
+               Faucet.fresh_funded_wallet(settle_ms: 100, poll_interval_ms: 0)
+
+      assert msg =~ ":poll_interval_ms must be a positive integer"
+      assert msg =~ "0"
+    end
+
+    test "rejects negative :poll_interval_ms with actionable error" do
+      assert {:error, msg} =
+               Faucet.fresh_funded_wallet(settle_ms: 100, poll_interval_ms: -50)
+
+      assert msg =~ ":poll_interval_ms must be a positive integer"
+    end
+
+    test "ignores invalid :poll_interval_ms when settle_ms is 0 (poll skipped)" do
+      # settle_ms: 0 skips polling entirely, so :poll_interval_ms is irrelevant.
+      # Validation cascade reflects that — only the timeout is required to be valid.
+      Req.Test.stub(:faucet_skip_poll, fn conn ->
+        Req.Test.json(conn, %{"jsonrpc" => "2.0", "id" => 1, "result" => ["0xfund"]})
+      end)
+
+      assert {:ok, _wallet} =
+               Faucet.fresh_funded_wallet(
+                 rpc_url: "http://localhost",
+                 req_options: [plug: {Req.Test, :faucet_skip_poll}],
+                 settle_ms: 0,
+                 poll_interval_ms: -999
+               )
+    end
   end
 end
