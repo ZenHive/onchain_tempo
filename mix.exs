@@ -1,7 +1,7 @@
 defmodule OnchainTempo.MixProject do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "0.2.1"
   @source_url "https://github.com/ZenHive/onchain_tempo"
 
   def project do
@@ -38,7 +38,7 @@ defmodule OnchainTempo.MixProject do
 
   defp deps do
     [
-      {:onchain, "~> 0.5"},
+      {:onchain, "~> 0.5.3"},
       {:req, "~> 0.5"},
       {:jason, "~> 1.4"},
       {:descripex, "~> 0.6"},
@@ -93,9 +93,15 @@ defmodule OnchainTempo.MixProject do
 
   defp dialyzer do
     [
+      # OOM mitigation: skip transitive deps (default is :app_tree).
+      # Tidewave/bandit's HTTP stack (plug, finch, mint, gun, cowlib, etc.)
+      # is not in lib/'s call graph and bloats PLT to ~800 modules.
+      # Note: Req is a runtime dep here — Req-call warnings are suppressed
+      # via ~r/Function Req\./ in .dialyzer_ignore.exs.
+      plt_add_deps: :apps_direct,
       plt_add_apps: [:mix],
-      plt_local_path: "_build/dialyzer",
-      plt_core_path: "_build/dialyzer",
+      plt_local_path: "priv/plts",
+      plt_core_path: "priv/plts",
       ignore_warnings: ".dialyzer_ignore.exs"
     ]
   end

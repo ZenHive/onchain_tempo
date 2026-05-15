@@ -1,0 +1,15 @@
+{
+  "extraKnownMarketplaces": {
+    "deltahedge": {
+      "source": { "source": "github", "repo": "ZenHive/claude-marketplace-elixir" }
+    },
+    "nethermind-defi-skills": {
+      "source": { "source": "github", "repo": "NethermindEth/defi-skills" }
+    }
+  },
+  "enabledPlugins": {
+    "elixir@deltahedge": true,
+    "elixir-workflows@deltahedge": true,
+    "defi-skills@nethermind-defi-skills": true
+  }
+}

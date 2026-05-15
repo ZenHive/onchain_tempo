@@ -20,12 +20,12 @@ defmodule Onchain.Tempo.Transaction.Builder do
 
   ## Dependencies
 
-  Uses `Signet.Signer.Curvy` for signing (keccak + secp256k1), `Signet.Recover`
-  for recovery bit, `ExRLP` for RLP encoding, and `Onchain.RPC` for nonce
-  fetching. All available transitively via `onchain`.
+  Uses `Cartouche.Signer.Curvy` for signing (keccak + secp256k1),
+  `Cartouche.Recover` for recovery bit, `ExRLP` for RLP encoding, and
+  `Onchain.RPC` for nonce fetching. All available transitively via `onchain`.
   """
+  alias Cartouche.Signer.Curvy
   alias Onchain.Tempo.TIP20
-  alias Signet.Signer.Curvy
 
   # EIP-2718 type byte for Tempo Transactions.
   @tempo_tx_type 0x76
@@ -252,7 +252,7 @@ defmodule Onchain.Tempo.Transaction.Builder do
     signing_payload = <<@tempo_tx_type>> <> rlp_encode(base_fields)
 
     with {:ok, sig} <- Curvy.sign(signing_payload, private_key),
-         {:ok, recid} <- Signet.Recover.find_recid(signing_payload, sig, sender_address) do
+         {:ok, recid} <- Cartouche.Recover.find_recid(signing_payload, sig, sender_address) do
       # Encode yParity as legacy v-value (27/28) to match ox/tempo convention.
       v = recid + 27
       sender_sig = <<sig.r::unsigned-big-size(256), sig.s::unsigned-big-size(256), v::8>>
@@ -265,21 +265,15 @@ defmodule Onchain.Tempo.Transaction.Builder do
 
   defp require_opt(opts, key, transform) do
     case Keyword.fetch(opts, key) do
-      {:ok, value} when not is_nil(value) ->
-        if transform, do: transform.(value), else: {:ok, value}
-
-      _ ->
-        {:error, "missing required option: #{key}"}
+      {:ok, value} when not is_nil(value) -> transform.(value)
+      _ -> {:error, "missing required option: #{key}"}
     end
   end
 
   defp optional_opt(opts, key, default, transform) do
     case Keyword.fetch(opts, key) do
-      {:ok, value} ->
-        if transform, do: transform.(value), else: {:ok, value}
-
-      :error ->
-        {:ok, default}
+      {:ok, value} -> transform.(value)
+      :error -> {:ok, default}
     end
   end
 

@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## v0.2.1
+
+### Migrate signing to Cartouche
+
+**Completed** 2026-05-15
+
+**What was done:**
+- Switched internal signing/recovery aliases from `Signet.Signer.Curvy` / `Signet.Recover` to `Cartouche.Signer.Curvy` / `Cartouche.Recover` in `Onchain.Tempo.Transaction` and `Onchain.Tempo.Transaction.Builder`. Cartouche is ZenHive's fork of signet — drop-in compatible, available transitively via `onchain`.
+- Tightened the `onchain` dep from `~> 0.5` to `~> 0.5.3` to ensure the cartouche-bearing version is resolved.
+- Public API unchanged — purely internal refactor for consumers.
+
+### Dialyzer configuration
+
+- Adopted `plt_add_deps: :apps_direct` to keep the PLT scoped to direct deps (tidewave/bandit's HTTP stack bloated the tree to ~800 modules).
+- Moved PLT files from `_build/dialyzer/` to `priv/plts/` so they survive `mix clean` / `_build` wipes. Added `/priv/plts/` to `.gitignore`.
+
 ## v0.2.0
 
 ### Public `Onchain.Tempo.Faucet` helper for `tempo_fundAddress`

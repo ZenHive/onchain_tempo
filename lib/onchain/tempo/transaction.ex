@@ -19,15 +19,15 @@ defmodule Onchain.Tempo.Transaction do
 
   ## Dependencies
 
-  Uses `ExRLP` (available transitively via `signet` → `onchain`) for RLP
-  decoding. Signing uses `Signet.Signer.Curvy` and `Signet.Recover` directly
-  because Tempo 0x76 is a non-standard transaction type.
+  Uses `ExRLP` (available transitively via `cartouche` → `onchain`) for RLP
+  decoding. Signing uses `Cartouche.Signer.Curvy` and `Cartouche.Recover`
+  directly because Tempo 0x76 is a non-standard transaction type.
   """
 
+  alias Cartouche.Recover
+  alias Cartouche.Signer.Curvy, as: CurvySigner
   alias Curvy.Signature, as: CurvySig
   alias Onchain.Tempo.TIP20
-  alias Signet.Recover
-  alias Signet.Signer.Curvy
 
   @enforce_keys [:chain_id, :calls, :raw]
   defstruct [:chain_id, :calls, :fields, :raw]
@@ -238,8 +238,8 @@ defmodule Onchain.Tempo.Transaction do
       fp_preimage_fields = build_fee_payer_preimage_fields(base_fields, fee_token, sender_address, has_key_auth)
       fp_signing_payload = <<@fee_payer_domain>> <> rlp_encode(fp_preimage_fields)
 
-      with {:ok, fp_sig} <- Curvy.sign(fp_signing_payload, fee_payer_key),
-           {:ok, fp_address} <- Curvy.get_address(fee_payer_key),
+      with {:ok, fp_sig} <- CurvySigner.sign(fp_signing_payload, fee_payer_key),
+           {:ok, fp_address} <- CurvySigner.get_address(fee_payer_key),
            {:ok, fp_recid} <- Recover.find_recid(fp_signing_payload, fp_sig, fp_address) do
         fp_sig_tuple = [
           if(fp_recid == 1, do: <<1>>, else: <<>>),

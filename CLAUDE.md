@@ -1,7 +1,10 @@
 @~/.claude/includes/across-instances.md
 @~/.claude/includes/critical-rules.md
+@~/.claude/includes/worktree-workflow.md
+
 @~/.claude/includes/task-prioritization.md
 @~/.claude/includes/task-writing.md
+@~/.claude/includes/rmap.md
 @~/.claude/includes/workflow-philosophy.md
 @~/.claude/includes/web-command.md
 @~/.claude/includes/elixir-setup.md
@@ -10,6 +13,10 @@
 @~/.claude/includes/code-style.md
 @~/.claude/includes/development-commands.md
 @~/.claude/includes/development-philosophy.md
+@~/.claude/includes/agent-economy.md
+
+@~/.claude/includes/delegation.md
+@~/.claude/includes/onchain-workspace.md
 
 # OnchainTempo
 
@@ -48,10 +55,10 @@ Onchain.Tempo.Faucet               — Moderato testnet faucet (tempo_fundAddres
 
 ### Key Design Decisions
 
-- **Signing uses Curvy directly** — Tempo 0x76 is non-standard; `Onchain.Signer` handles EIP-1559 only. Direct `Signet.Signer.Curvy` + `Signet.Recover.find_recid/3` is correct.
+- **Signing uses Curvy directly** — Tempo 0x76 is non-standard; `Onchain.Signer` handles EIP-1559 only. Direct `Cartouche.Signer.Curvy` + `Cartouche.Recover.find_recid/3` is correct.
 - **TIP20 owns all selectors** — Single source of truth, eliminates duplication.
 - **RPC uses plain errors** — `{:error, "message"}` not wrapped error structs.
-- **ExRLP is transitive** — Available via onchain → signet. `@dialyzer` suppressions needed.
+- **ExRLP is transitive** — Available via onchain → cartouche. `@dialyzer` suppressions needed.
 
 ### Dependencies
 
