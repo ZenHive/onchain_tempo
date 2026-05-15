@@ -241,5 +241,83 @@ defmodule Onchain.Tempo.FaucetTest do
                  poll_interval_ms: -999
                )
     end
+
+    test "errors loudly when eth_getBalance returns a malformed hex string" do
+      Req.Test.stub(:faucet_malformed_hex, fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+
+        result =
+          case decoded["method"] do
+            "tempo_fundAddress" -> ["0xfund"]
+            # Missing 0x prefix — node-side protocol violation.
+            "eth_getBalance" -> "1"
+          end
+
+        Req.Test.json(conn, %{"jsonrpc" => "2.0", "id" => 1, "result" => result})
+      end)
+
+      assert {:error, msg} =
+               Faucet.fresh_funded_wallet(
+                 rpc_url: "http://localhost",
+                 req_options: [plug: {Req.Test, :faucet_malformed_hex}],
+                 settle_ms: 100,
+                 poll_interval_ms: 5
+               )
+
+      assert msg =~ "unexpected eth_getBalance result"
+    end
+
+    test "errors loudly when eth_getBalance returns a non-string value" do
+      Req.Test.stub(:faucet_nonstring, fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+
+        result =
+          case decoded["method"] do
+            "tempo_fundAddress" -> ["0xfund"]
+            "eth_getBalance" -> 123
+          end
+
+        Req.Test.json(conn, %{"jsonrpc" => "2.0", "id" => 1, "result" => result})
+      end)
+
+      assert {:error, msg} =
+               Faucet.fresh_funded_wallet(
+                 rpc_url: "http://localhost",
+                 req_options: [plug: {Req.Test, :faucet_nonstring}],
+                 settle_ms: 100,
+                 poll_interval_ms: 5
+               )
+
+      assert msg =~ "unexpected eth_getBalance result"
+    end
+
+    test "errors loudly when eth_getBalance returns a negative hex value" do
+      # "0x-1" is a protocol violation; treat as malformed rather than silently
+      # timing out (which is what an unguarded Integer.parse would do).
+      Req.Test.stub(:faucet_negative_hex, fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+
+        result =
+          case decoded["method"] do
+            "tempo_fundAddress" -> ["0xfund"]
+            "eth_getBalance" -> "0x-1"
+          end
+
+        Req.Test.json(conn, %{"jsonrpc" => "2.0", "id" => 1, "result" => result})
+      end)
+
+      assert {:error, msg} =
+               Faucet.fresh_funded_wallet(
+                 rpc_url: "http://localhost",
+                 req_options: [plug: {Req.Test, :faucet_negative_hex}],
+                 settle_ms: 100,
+                 poll_interval_ms: 5
+               )
+
+      assert msg =~ "unexpected eth_getBalance result"
+    end
   end
 end

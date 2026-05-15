@@ -189,6 +189,7 @@
       ],
       "body": "`Onchain.Tempo.Faucet.fresh_funded_wallet/2` currently sleeps a fixed `@default_settle_ms` (2_500ms) after funding before returning. Replace with a poll loop on `eth_getTransactionCount` or `eth_getBalance` so the helper returns as soon as the funding transaction lands (Moderato blocks ~500ms; the fixed sleep wastes ~2s per integration test). Discovered during the v0.1.1 integration test work and carried forward when the helper was promoted to a public module in v0.2.0.\n",
       "created_at": "2026-04-19",
+      "done_at": "2026-05-15",
       "scored_at": "2026-05-15",
       "cross_repo": []
     },

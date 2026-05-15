@@ -82,7 +82,7 @@ wraps the non-standard `tempo_fundAddress` JSON-RPC:
 # Fund an existing address.
 {:ok, [tx_hash | _]} = Onchain.Tempo.Faucet.fund_address("0xabc...")
 
-# Generate + fund a fresh keypair (waits for settlement before returning).
+# Generate + fund a fresh keypair (polls for confirmation before returning).
 {:ok, %{private_key: priv, address_hex: hex, address_bin: bin}} =
   Onchain.Tempo.Faucet.fresh_funded_wallet()
 ```

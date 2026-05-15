@@ -136,15 +136,21 @@ defmodule Onchain.Tempo.Faucet do
   defp poll_balance(addr_hex, url, opts, deadline, interval_ms, timeout_ms) do
     with {:ok, balance_hex} <- rpc_request("eth_getBalance", [addr_hex, "latest"], url, opts),
          {:ok, balance} <- parse_balance_hex(balance_hex) do
+      now = System.monotonic_time(:millisecond)
+
       cond do
         balance > 0 ->
           :ok
 
-        System.monotonic_time(:millisecond) >= deadline ->
+        now >= deadline ->
           {:error, "timeout waiting for funding to confirm after #{timeout_ms}ms"}
 
         true ->
-          Process.sleep(interval_ms)
+          # Cap the inter-poll sleep so a large :poll_interval_ms can't overshoot
+          # the deadline by almost a full interval. Floor at 1 ms so we still
+          # yield to the scheduler when budget is nearly exhausted.
+          remaining = deadline - now
+          Process.sleep(max(min(interval_ms, remaining), 1))
           poll_balance(addr_hex, url, opts, deadline, interval_ms, timeout_ms)
       end
     end
@@ -153,7 +159,7 @@ defmodule Onchain.Tempo.Faucet do
   @spec parse_balance_hex(term()) :: {:ok, non_neg_integer()} | {:error, String.t()}
   defp parse_balance_hex("0x" <> hex) do
     case Integer.parse(hex, 16) do
-      {n, ""} -> {:ok, n}
+      {n, ""} when n >= 0 -> {:ok, n}
       _ -> {:error, "unexpected eth_getBalance result: #{inspect("0x" <> hex)}"}
     end
   end
