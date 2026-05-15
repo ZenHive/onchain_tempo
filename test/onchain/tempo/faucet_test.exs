@@ -138,5 +138,66 @@ defmodule Onchain.Tempo.FaucetTest do
 
       assert msg =~ "out of funds"
     end
+
+    test "polls eth_getBalance and returns once funding lands" do
+      counter = :counters.new(1, [])
+
+      Req.Test.stub(:faucet_poll_success, fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+
+        result =
+          case decoded["method"] do
+            "tempo_fundAddress" ->
+              ["0xfund"]
+
+            "eth_getBalance" ->
+              n = :counters.get(counter, 1)
+              :counters.add(counter, 1, 1)
+              # First poll returns 0; subsequent polls return 1 ETH.
+              if n == 0, do: "0x0", else: "0xde0b6b3a7640000"
+          end
+
+        Req.Test.json(conn, %{"jsonrpc" => "2.0", "id" => 1, "result" => result})
+      end)
+
+      assert {:ok, wallet} =
+               Faucet.fresh_funded_wallet(
+                 rpc_url: "http://localhost",
+                 req_options: [plug: {Req.Test, :faucet_poll_success}],
+                 settle_ms: 500,
+                 poll_interval_ms: 10
+               )
+
+      assert byte_size(wallet.private_key) == 32
+      assert byte_size(wallet.address_bin) == 20
+      # Polling actually ran — counter advanced past the initial zero balance.
+      assert :counters.get(counter, 1) >= 2
+    end
+
+    test "returns {:error, _} when the funding never confirms before settle_ms" do
+      Req.Test.stub(:faucet_poll_timeout, fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+
+        result =
+          case decoded["method"] do
+            "tempo_fundAddress" -> ["0xfund"]
+            "eth_getBalance" -> "0x0"
+          end
+
+        Req.Test.json(conn, %{"jsonrpc" => "2.0", "id" => 1, "result" => result})
+      end)
+
+      assert {:error, msg} =
+               Faucet.fresh_funded_wallet(
+                 rpc_url: "http://localhost",
+                 req_options: [plug: {Req.Test, :faucet_poll_timeout}],
+                 settle_ms: 30,
+                 poll_interval_ms: 5
+               )
+
+      assert msg =~ "timeout"
+    end
   end
 end

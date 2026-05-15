@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Faucet — poll for funding confirmation instead of fixed sleep
+
+`Onchain.Tempo.Faucet.fresh_funded_wallet/1` now polls `eth_getBalance` on the
+fresh address until the funding transaction lands, replacing the previous
+fixed 2.5 s `Process.sleep`. The helper returns as soon as the balance is
+non-zero, cutting per-call overhead from a flat ~2.5 s to ~one block (~500 ms
+on Moderato).
+
+`:settle_ms` is now the poll **timeout** (default `10_000` ms); `settle_ms: 0`
+still skips the wait entirely for unit tests that mock the RPC layer. New
+`:poll_interval_ms` option (default `200` ms) tunes the poll cadence.
+
 ## v0.2.1
 
 ### Migrate signing to Cartouche

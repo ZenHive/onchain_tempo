@@ -167,7 +167,7 @@
       "id": 6,
       "phase": 3,
       "bundle": "faucet_polish",
-      "status": "pending",
+      "status": "done",
       "title": "Replace Faucet fixed-sleep settle with poll loop",
       "scores": {
         "d": 3,
