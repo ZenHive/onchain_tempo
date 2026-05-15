@@ -15,7 +15,7 @@ defmodule Onchain.Tempo.Faucet do
       # Fund an existing address.
       {:ok, [tx_hash | _]} = Onchain.Tempo.Faucet.fund_address("0xabc...")
 
-      # Generate + fund a fresh keypair (waits for settlement before returning).
+      # Generate + fund a fresh keypair (polls for confirmation before returning).
       {:ok, %{private_key: priv, address_hex: hex, address_bin: bin}} =
         Onchain.Tempo.Faucet.fresh_funded_wallet()
 
@@ -30,14 +30,21 @@ defmodule Onchain.Tempo.Faucet do
     * `:rpc_url` — RPC endpoint URL. Defaults to `rpc_url/0`.
     * `:req_options` — keyword list passed to `Req.request/2` (timeouts,
       adapters, `Req.Test` plug, etc.)
-    * `:settle_ms` (`fresh_funded_wallet/1` only) — milliseconds to sleep after
-      funding before returning. Defaults to `2_500`. Set `0` in unit tests.
+
+  `fresh_funded_wallet/1` additionally accepts:
+
+    * `:settle_ms` — maximum milliseconds to wait for the funding transaction
+      to confirm. Defaults to `10_000`. Set to `0` to skip the wait entirely
+      (used by unit tests that mock the RPC layer).
+    * `:poll_interval_ms` — interval between `eth_getBalance` polls. Defaults
+      to `200`.
   """
   # Jason, Req are transitive deps via onchain — not resolved in PLT with path deps
   @dialyzer [:no_unknown]
 
   @default_rpc_url "https://rpc.moderato.tempo.xyz"
-  @default_settle_ms 2_500
+  @default_wait_timeout_ms 10_000
+  @default_poll_interval_ms 200
 
   @doc """
   RPC URL used by the faucet by default — `TEMPO_RPC_URL` env var if set,
@@ -65,36 +72,96 @@ defmodule Onchain.Tempo.Faucet do
   end
 
   @doc """
-  Generate a fresh 32-byte keypair, fund it via `tempo_fundAddress`, and wait
-  for settlement.
+  Generate a fresh 32-byte keypair, fund it via `tempo_fundAddress`, and poll
+  `eth_getBalance` until the funding transaction lands on-chain.
 
   Returns the wallet as a map with `:private_key` (32 bytes), `:address_hex`
   (`"0x"` + 40 hex), and `:address_bin` (20 bytes).
+
+  Polling is bounded by `:settle_ms` (default `10_000` ms); pass `0` to skip
+  the wait entirely. The interval between polls is controlled by
+  `:poll_interval_ms` (default `200` ms).
   """
   @spec fresh_funded_wallet(keyword()) ::
           {:ok, %{private_key: binary(), address_hex: String.t(), address_bin: binary()}}
           | {:error, String.t()}
   def fresh_funded_wallet(opts \\ []) do
-    priv = :crypto.strong_rand_bytes(32)
-    {:ok, addr_hex} = Onchain.Signer.address_from_key(priv)
-    addr_bin = addr_hex |> String.trim_leading("0x") |> Base.decode16!(case: :mixed)
+    with :ok <- validate_wait_opts(opts) do
+      priv = :crypto.strong_rand_bytes(32)
+      {:ok, addr_hex} = Onchain.Signer.address_from_key(priv)
+      addr_bin = addr_hex |> String.trim_leading("0x") |> Base.decode16!(case: :mixed)
 
-    case fund_address(addr_hex, opts) do
-      {:ok, _hashes} ->
-        # TODO(Task 6): replace fixed-sleep settle with poll loop on
-        # getTransactionCount/getBalance once a retry helper exists.
-        # Moderato blocks ~500ms; 2.5s usually suffices.
-        settle_ms = Keyword.get(opts, :settle_ms, @default_settle_ms)
-        if settle_ms > 0, do: Process.sleep(settle_ms)
+      with {:ok, _hashes} <- fund_address(addr_hex, opts),
+           :ok <- wait_for_funding(addr_hex, opts) do
         {:ok, %{private_key: priv, address_hex: addr_hex, address_bin: addr_bin}}
-
-      {:error, _} = err ->
-        err
+      end
     end
   end
 
   # --- Private ---
 
+  @spec validate_wait_opts(keyword()) :: :ok | {:error, String.t()}
+  defp validate_wait_opts(opts) do
+    timeout_ms = Keyword.get(opts, :settle_ms, @default_wait_timeout_ms)
+    interval_ms = Keyword.get(opts, :poll_interval_ms, @default_poll_interval_ms)
+
+    cond do
+      not (is_integer(timeout_ms) and timeout_ms >= 0) ->
+        {:error, ":settle_ms must be a non-negative integer, got: #{inspect(timeout_ms)}"}
+
+      timeout_ms > 0 and not (is_integer(interval_ms) and interval_ms > 0) ->
+        {:error, ":poll_interval_ms must be a positive integer, got: #{inspect(interval_ms)}"}
+
+      true ->
+        :ok
+    end
+  end
+
+  @spec wait_for_funding(String.t(), keyword()) :: :ok | {:error, String.t()}
+  defp wait_for_funding(addr_hex, opts) do
+    timeout_ms = Keyword.get(opts, :settle_ms, @default_wait_timeout_ms)
+
+    if timeout_ms == 0 do
+      :ok
+    else
+      interval_ms = Keyword.get(opts, :poll_interval_ms, @default_poll_interval_ms)
+      {url, rpc_opts} = Keyword.pop(opts, :rpc_url, rpc_url())
+      deadline = System.monotonic_time(:millisecond) + timeout_ms
+      poll_balance(addr_hex, url, rpc_opts, deadline, interval_ms, timeout_ms)
+    end
+  end
+
+  @spec poll_balance(String.t(), String.t(), keyword(), integer(), pos_integer(), pos_integer()) ::
+          :ok | {:error, String.t()}
+  defp poll_balance(addr_hex, url, opts, deadline, interval_ms, timeout_ms) do
+    with {:ok, balance_hex} <- rpc_request("eth_getBalance", [addr_hex, "latest"], url, opts),
+         {:ok, balance} <- parse_balance_hex(balance_hex) do
+      cond do
+        balance > 0 ->
+          :ok
+
+        System.monotonic_time(:millisecond) >= deadline ->
+          {:error, "timeout waiting for funding to confirm after #{timeout_ms}ms"}
+
+        true ->
+          Process.sleep(interval_ms)
+          poll_balance(addr_hex, url, opts, deadline, interval_ms, timeout_ms)
+      end
+    end
+  end
+
+  @spec parse_balance_hex(term()) :: {:ok, non_neg_integer()} | {:error, String.t()}
+  defp parse_balance_hex("0x" <> hex) do
+    case Integer.parse(hex, 16) do
+      {n, ""} -> {:ok, n}
+      _ -> {:error, "unexpected eth_getBalance result: #{inspect("0x" <> hex)}"}
+    end
+  end
+
+  defp parse_balance_hex(other), do: {:error, "unexpected eth_getBalance result: #{inspect(other)}"}
+
+  @spec rpc_request(String.t(), list(), String.t(), keyword()) ::
+          {:ok, term()} | {:error, String.t()}
   defp rpc_request(method, params, rpc_url, opts) do
     req_options = Keyword.get(opts, :req_options, [])
 

@@ -132,7 +132,7 @@ Bookkeeping closure — verified the MPP-side migration was already accomplished
 id = 6
 phase = 3
 bundle = "faucet_polish"
-status = "pending"
+status = "done"
 title = "Replace Faucet fixed-sleep settle with poll loop"
 scores = { d = 3, b = 3, u = 3 }
 created_at = "2026-04-19"
