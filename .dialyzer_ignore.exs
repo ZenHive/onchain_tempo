@@ -10,5 +10,7 @@
   # Onchain modules
   ~r/Function Onchain\./,
   # Descripex (Discoverable macro)
-  ~r/Function Descripex\./
+  ~r/Function Descripex\./,
+  # ExRLP (via onchain → cartouche; transitive, only surfaces in test env via test/support)
+  ~r/Function ExRLP\./
 ]
