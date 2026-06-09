@@ -1,7 +1,7 @@
 defmodule OnchainTempo.MixProject do
   use Mix.Project
 
-  @version "0.2.1"
+  @version "0.2.2"
   @source_url "https://github.com/ZenHive/onchain_tempo"
 
   def project do
@@ -38,10 +38,10 @@ defmodule OnchainTempo.MixProject do
 
   defp deps do
     [
-      {:onchain, "~> 0.5.3"},
+      {:onchain, "~> 0.7.0"},
       {:req, "~> 0.5"},
       {:jason, "~> 1.4"},
-      {:descripex, "~> 0.6"},
+      {:descripex, "~> 0.7"},
 
       # Req.Test needs plug for test stubs; tidewave needs it in dev
       {:plug, "~> 1.16", only: [:dev, :test]},
@@ -54,7 +54,7 @@ defmodule OnchainTempo.MixProject do
       {:styler, "~> 1.0", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:doctor, "~> 0.22", only: [:dev, :test], runtime: false},
+      {:doctor, "~> 0.23", only: [:dev, :test], runtime: false},
       {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.39", only: :dev, runtime: false}
     ]

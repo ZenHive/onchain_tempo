@@ -1,6 +1,16 @@
 # Changelog
 
-## [Unreleased]
+## v0.2.2
+
+### Dependency updates
+
+- Bumped `onchain` `~> 0.5.3` → `~> 0.7.0`. onchain 0.7.0 cascades a major
+  `decimal` `2.0` → `3.1.1` jump and pulls `descripex` `0.7.0` + `cartouche`
+  `0.2.2` transitively.
+- Bumped `descripex` `~> 0.6` → `~> 0.7` and dev-tool `doctor` `~> 0.22` →
+  `~> 0.23` (0.23 requires `decimal ~> 3.1`, unblocked by the decimal jump).
+- `req` resolves to `0.6.1`. No library code changes — compile clean under
+  `--warnings-as-errors`, full offline suite green.
 
 ### Faucet — poll for funding confirmation instead of fixed sleep
 
