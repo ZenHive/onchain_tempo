@@ -31,5 +31,5 @@
 | Task | Status | Notes |
 |------|--------|-------|
 | Task 6 | ✅ | 🎁 **faucet_polish** · Replace Faucet fixed-sleep settle with poll loop [D:3/B:3/U:3 → Eff:1.0] 📋 |
-| Task 7 | ✅ | 🎁 **public_faucet** · Public `Onchain.Tempo.Faucet` helper for `tempo_fundAddress` [D:2/B:5/U:5 → Eff:2.5] 🎯 |
+| Task 7 | ✅ | 🎁 **public_faucet** · Public `Onchain.Tempo.Faucet` helper for `tempo_fundAddress` [D:2/B:5/U:5 → Eff:2.5?] 🎯 |
 <!-- TASKS:END -->
