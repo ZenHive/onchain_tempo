@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "project": "onchain_tempo",
   "default_branch": "main",
   "vision": "Standalone Tempo blockchain primitives for the Elixir ecosystem.",
@@ -57,6 +57,7 @@
       "description": "Promote test-only Moderato faucet helper to public Onchain.Tempo.Faucet module."
     }
   },
+  "milestones": {},
   "task": [
     {
       "id": 1,
@@ -70,6 +71,7 @@
         "u": 10
       },
       "eff": 1.25,
+      "dep_layer": 0,
       "markers": [],
       "depends_on": [],
       "shipped_in": "v0.1.0",
@@ -77,6 +79,7 @@
       "created_at": "2026-03-28",
       "done_at": "2026-03-28",
       "scored_at": "2026-03-28",
+      "implemented": "Extracted TIP20, Transaction, Transaction.Builder, RPC, Transfer, and the OnchainTempo Discoverable root module from MPP into a standalone library with 77 unit tests. Shipped as v0.1.0.",
       "cross_repo": []
     },
     {
@@ -91,6 +94,7 @@
         "u": 8
       },
       "eff": 4.0,
+      "dep_layer": 0,
       "markers": [],
       "depends_on": [],
       "shipped_in": "v0.1.0",
@@ -98,6 +102,7 @@
       "created_at": "2026-03-28",
       "done_at": "2026-03-28",
       "scored_at": "2026-03-28",
+      "implemented": "Published onchain_tempo v0.1.0 to Hex; onchain switched from path dep to the published version.",
       "cross_repo": []
     },
     {
@@ -112,6 +117,7 @@
         "u": 6
       },
       "eff": 2.17,
+      "dep_layer": 0,
       "markers": [],
       "depends_on": [],
       "shipped_in": "v0.1.1",
@@ -119,6 +125,7 @@
       "created_at": "2026-04-19",
       "done_at": "2026-04-19",
       "scored_at": "2026-04-19",
+      "implemented": "Added opt-in :integration suite at test/onchain/tempo/integration/moderato_test.exs (3 tests: Builder round-trip, fetch_receipt not-found, broadcast_sync self-transfer) against live Moderato, plus a self-funding test/support/moderato_faucet.ex helper. Shipped in v0.1.1.",
       "cross_repo": []
     },
     {
@@ -133,6 +140,7 @@
         "u": 5
       },
       "eff": 4.0,
+      "dep_layer": 0,
       "markers": [],
       "depends_on": [],
       "shipped_in": "v0.1.1",
@@ -140,6 +148,7 @@
       "created_at": "2026-04-19",
       "done_at": "2026-04-19",
       "scored_at": "2026-04-19",
+      "implemented": "Bumped Builder @default_gas_limit from 200_000 to 500_000 to cover the ~272k a stock TIP-20 transfer consumes on Moderato. Shipped in v0.1.1.",
       "cross_repo": []
     },
     {
@@ -154,6 +163,7 @@
         "u": 9
       },
       "eff": 2.83,
+      "dep_layer": 0,
       "markers": [],
       "depends_on": [],
       "shipped_in": "v0.1.1",
@@ -161,6 +171,7 @@
       "created_at": "2026-04-19",
       "done_at": "2026-04-19",
       "scored_at": "2026-04-19",
+      "implemented": "Verified MPP migration was already complete (MPP Task 23, 2026-03-28); MPP aliases Onchain.Tempo.{RPC,Transaction,Transfer}. No code change — closed the stale roadmap entry. v0.1.1.",
       "cross_repo": []
     },
     {
@@ -175,6 +186,7 @@
         "u": 3
       },
       "eff": 1.0,
+      "dep_layer": 0,
       "markers": [],
       "depends_on": [],
       "acceptance_criteria": [
@@ -191,6 +203,7 @@
       "created_at": "2026-04-19",
       "done_at": "2026-05-15",
       "scored_at": "2026-05-15",
+      "implemented": "Replaced the Faucet fixed @default_settle_ms sleep with an eth_getBalance poll loop bounded by a configurable timeout / max-iterations; unit tests retain the zero-wait shortcut. Shipped in PR #1.",
       "cross_repo": []
     },
     {
@@ -205,6 +218,7 @@
         "u": 5
       },
       "eff": 2.5,
+      "dep_layer": 0,
       "markers": [],
       "depends_on": [],
       "shipped_in": "v0.2.0",
@@ -212,6 +226,7 @@
       "created_at": "2026-04-19",
       "done_at": "2026-04-19",
       "scored_at": "2026-04-19",
+      "implemented": "Promoted the test-only ModeratoFaucet to public Onchain.Tempo.Faucet (rpc_url/0, fund_address/2, fresh_funded_wallet/1) registered in OnchainTempo's Discoverable list, with Req.Test-stubbed unit tests. Shipped in v0.2.0.",
       "cross_repo": []
     },
     {
@@ -226,6 +241,7 @@
         "u": 5
       },
       "eff": 2.75,
+      "dep_layer": 0,
       "markers": [],
       "depends_on": [],
       "shipped_in": "v0.2.1",
@@ -233,6 +249,7 @@
       "created_at": "2026-05-15",
       "done_at": "2026-05-15",
       "scored_at": "2026-05-15",
+      "implemented": "Switched signing/recovery aliases from Signet.Signer.Curvy / Signet.Recover to Cartouche.Signer.Curvy / Cartouche.Recover in Transaction and Transaction.Builder; tightened the onchain dep to ~> 0.5.3. Public API unchanged. Shipped in v0.2.1.",
       "cross_repo": []
     },
     {
@@ -247,6 +264,7 @@
         "u": 6
       },
       "eff": 2.75,
+      "dep_layer": 0,
       "markers": [],
       "depends_on": [],
       "shipped_in": "v0.2.1",
@@ -254,6 +272,7 @@
       "created_at": "2026-05-15",
       "done_at": "2026-05-15",
       "scored_at": "2026-05-15",
+      "implemented": "Adopted plt_add_deps: :apps_direct to scope the PLT to direct deps (avoiding OOM on the bloated tidewave/bandit tree) and moved PLT files to priv/plts/ (gitignored) so they survive mix clean. Shipped in v0.2.1.",
       "cross_repo": []
     }
   ]

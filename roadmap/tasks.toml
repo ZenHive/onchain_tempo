@@ -1,4 +1,4 @@
-schema_version = 1
+schema_version = 2
 project = "onchain_tempo"
 default_branch = "main"
 vision = "Standalone Tempo blockchain primitives for the Elixir ecosystem."
@@ -67,6 +67,7 @@ shipped_in = "v0.1.0"
 body = """
 Initial extraction of Tempo blockchain primitives from MPP (Machine Payments Protocol) into a standalone Elixir library. Built `Onchain.Tempo.TIP20` (selectors, calldata encoders, DEX address), `Onchain.Tempo.Transaction` (0x76 struct, RLP deserialization, payment matching, fee-payer co-signing on 0x78 domain), `Onchain.Tempo.Transaction.Builder` (build + sign 0x76 — transfer, multicall, fee-payer variants), `Onchain.Tempo.RPC` (JSON-RPC: broadcast async/sync, fetch + parse receipt), `Onchain.Tempo.Transfer` (TransferWithMemo event log parsing), and the `OnchainTempo` root module with Descripex Discoverable. 77 unit tests covering deserialization, calldata encoding, payment matching, call scope validation, RPC stubs, and builder validation.
 """
+implemented = "Extracted TIP20, Transaction, Transaction.Builder, RPC, Transfer, and the OnchainTempo Discoverable root module from MPP into a standalone library with 77 unit tests. Shipped as v0.1.0."
 
 [[task]]
 id = 2
@@ -82,6 +83,7 @@ shipped_in = "v0.1.0"
 body = """
 Publish onchain_tempo to Hex as v0.1.0 so downstream consumers (MPP and friends) can depend on a published version instead of a path dep. After publish, `onchain` switched from path dep to published version. See CHANGELOG.md v0.1.0.
 """
+implemented = "Published onchain_tempo v0.1.0 to Hex; onchain switched from path dep to the published version."
 
 [[task]]
 id = 3
@@ -97,6 +99,7 @@ shipped_in = "v0.1.1"
 body = """
 Opt-in `:integration` suite at `test/onchain/tempo/integration/moderato_test.exs` exercising the full Builder → RPC pipeline against live Moderato (chain `42_431`, `https://rpc.moderato.tempo.xyz`). Three tests: Builder real nonce fetch + 0x76 round-trip via `Transaction.deserialize/1`, `RPC.fetch_receipt/2` returning `{:error, "Transaction not found on-chain"}` for unknown hashes, and `RPC.broadcast_sync/2` confirming a self-transfer of pathUSD with a real receipt + logs. New `test/support/moderato_faucet.ex` helper self-funds a fresh keypair per test via the Moderato `tempo_fundAddress` custom JSON-RPC — no env var required. Fresh keypair per test avoids nonce races; loud `flunk/1` on funding failure per project critical-rules.
 """
+implemented = "Added opt-in :integration suite at test/onchain/tempo/integration/moderato_test.exs (3 tests: Builder round-trip, fetch_receipt not-found, broadcast_sync self-transfer) against live Moderato, plus a self-funding test/support/moderato_faucet.ex helper. Shipped in v0.1.1."
 
 [[task]]
 id = 4
@@ -112,6 +115,7 @@ shipped_in = "v0.1.1"
 body = """
 `Onchain.Tempo.Transaction.Builder` `@default_gas_limit` bumped from 200_000 to 500_000 — a stock TIP-20 transfer on Moderato consumes ~272k, so the previous default under-provisioned real transfers. Integration test no longer needs a per-call `gas_limit` override. 500k is a ceiling, not an amount spent — no real-world cost change; just prevents `out of gas` for the common TIP-20 path.
 """
+implemented = "Bumped Builder @default_gas_limit from 200_000 to 500_000 to cover the ~272k a stock TIP-20 transfer consumes on Moderato. Shipped in v0.1.1."
 
 [[task]]
 id = 5
@@ -127,6 +131,7 @@ shipped_in = "v0.1.1"
 body = """
 Bookkeeping closure — verified the MPP-side migration was already accomplished during the original v0.1.0 extraction (MPP Task 23, 2026-03-28). `MPP.Methods.Tempo` aliases `Onchain.Tempo.{RPC, Transaction, Transfer}`; no `MPP.Tempo.Transaction` module remains in `mpp/lib/`. Remaining `MPP.Tempo.*` modules (`Store`, `ConCacheStore`, `Methods.Tempo.SessionReceipt`) are MPP-specific concerns and intentionally stay in MPP. No code changes; the roadmap entry was stale.
 """
+implemented = "Verified MPP migration was already complete (MPP Task 23, 2026-03-28); MPP aliases Onchain.Tempo.{RPC,Transaction,Transfer}. No code change — closed the stale roadmap entry. v0.1.1."
 
 [[task]]
 id = 6
@@ -141,6 +146,7 @@ done_at = "2026-05-15"
 body = """
 `Onchain.Tempo.Faucet.fresh_funded_wallet/2` currently sleeps a fixed `@default_settle_ms` (2_500ms) after funding before returning. Replace with a poll loop on `eth_getTransactionCount` or `eth_getBalance` so the helper returns as soon as the funding transaction lands (Moderato blocks ~500ms; the fixed sleep wastes ~2s per integration test). Discovered during the v0.1.1 integration test work and carried forward when the helper was promoted to a public module in v0.2.0.
 """
+implemented = "Replaced the Faucet fixed @default_settle_ms sleep with an eth_getBalance poll loop bounded by a configurable timeout / max-iterations; unit tests retain the zero-wait shortcut. Shipped in PR #1."
 acceptance_criteria = [
   "fresh_funded_wallet/1 returns as soon as the funding tx is confirmed on-chain (not after a fixed sleep)",
   "Integration suite remains green on Moderato (faucet still funds reliably)",
@@ -166,6 +172,7 @@ shipped_in = "v0.2.0"
 body = """
 Promoted the previously test-only `Onchain.Tempo.TestSupport.ModeratoFaucet` (`test/support/moderato_faucet.ex`) into public `Onchain.Tempo.Faucet` at `lib/onchain/tempo/faucet.ex` so downstream consumers writing their own integration suites can reuse the Moderato faucet recipe. Public API: `rpc_url/0` (Moderato default, `TEMPO_RPC_URL` override), `fund_address/2` (thin wrapper around `tempo_fundAddress` JSON-RPC, returns `{:ok, [tx_hash]}`), `fresh_funded_wallet/1` (generates a 32-byte keypair, funds it, sleeps for settlement). Both accept an opts keyword list with `:rpc_url`, `:req_options`, and (for `fresh_funded_wallet/1`) `:settle_ms`. Registered in `OnchainTempo`'s Descripex.Discoverable module list. Integration suite migrated; old test-support helper deleted; new unit tests at `test/onchain/tempo/faucet_test.exs` cover happy/error/transport paths via Req.Test stubs.
 """
+implemented = "Promoted the test-only ModeratoFaucet to public Onchain.Tempo.Faucet (rpc_url/0, fund_address/2, fresh_funded_wallet/1) registered in OnchainTempo's Discoverable list, with Req.Test-stubbed unit tests. Shipped in v0.2.0."
 
 [[task]]
 id = 8
@@ -181,6 +188,7 @@ shipped_in = "v0.2.1"
 body = """
 Switched internal signing/recovery aliases from `Signet.Signer.Curvy` / `Signet.Recover` to `Cartouche.Signer.Curvy` / `Cartouche.Recover` in `Onchain.Tempo.Transaction` and `Onchain.Tempo.Transaction.Builder`. Cartouche is ZenHive's fork of signet — drop-in compatible, available transitively via `onchain`. Tightened the `onchain` dep from `~> 0.5` to `~> 0.5.3` to ensure the cartouche-bearing version is resolved. Public API unchanged — purely internal refactor for consumers.
 """
+implemented = "Switched signing/recovery aliases from Signet.Signer.Curvy / Signet.Recover to Cartouche.Signer.Curvy / Cartouche.Recover in Transaction and Transaction.Builder; tightened the onchain dep to ~> 0.5.3. Public API unchanged. Shipped in v0.2.1."
 
 [[task]]
 id = 9
@@ -196,3 +204,4 @@ shipped_in = "v0.2.1"
 body = """
 Adopted `plt_add_deps: :apps_direct` to keep the PLT scoped to direct deps (tidewave/bandit's HTTP stack bloated the tree to ~800 modules and caused OOM kills on PLT builds). Moved PLT files from `_build/dialyzer/` to `priv/plts/` so they survive `mix clean` / `_build` wipes. Added `/priv/plts/` to `.gitignore`.
 """
+implemented = "Adopted plt_add_deps: :apps_direct to scope the PLT to direct deps (avoiding OOM on the bloated tidewave/bandit tree) and moved PLT files to priv/plts/ (gitignored) so they survive mix clean. Shipped in v0.2.1."
