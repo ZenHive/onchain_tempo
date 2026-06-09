@@ -1,21 +1,14 @@
-@~/.claude/includes/across-instances.md
+<!-- Selective-load (Opus 4.8): eager floor = critical-rules + harness-workflow (this repo is
+     harness-driven — the OTP dispatch→review→land loop is the active workflow). onchain-workspace
+     is the harness workspace add-on (7-repo roster + dependency shape), eager family-wide.
+     Everything else previously imported here (across-instances, worktree, task-prioritization/writing, rmap,
+     workflow-philosophy, web-command, elixir-setup, ex-unit-json, dialyzer-json, code-style,
+     development-commands/philosophy, agent-economy) is skill-on-demand via the elixir / task-driver
+     / dev-lifecycle plugins. The Linear-as-queue + Codex/Cursor delegation flow (delegation +
+     onchain-workspace) is retired — harness replaced it. Re-add an @-import per-surface only if
+     Opus visibly degrades on it. See ~/.claude/setup-guide.md § "Skills vs Includes". -->
 @~/.claude/includes/critical-rules.md
-@~/.claude/includes/worktree-workflow.md
-
-@~/.claude/includes/task-prioritization.md
-@~/.claude/includes/task-writing.md
-@~/.claude/includes/rmap.md
-@~/.claude/includes/workflow-philosophy.md
-@~/.claude/includes/web-command.md
-@~/.claude/includes/elixir-setup.md
-@~/.claude/includes/ex-unit-json.md
-@~/.claude/includes/dialyzer-json.md
-@~/.claude/includes/code-style.md
-@~/.claude/includes/development-commands.md
-@~/.claude/includes/development-philosophy.md
-@~/.claude/includes/agent-economy.md
-
-@~/.claude/includes/delegation.md
+@~/.claude/includes/harness-workflow.md
 @~/.claude/includes/onchain-workspace.md
 
 # OnchainTempo
@@ -23,6 +16,8 @@
 Tempo blockchain primitives for Elixir. Extracted from MPP (Machine Payments Protocol) to provide standalone 0x76 transaction handling, TIP-20 encoding, RPC, and event parsing.
 
 **Repo:** [ZenHive/onchain_tempo](https://github.com/ZenHive/onchain_tempo) | **Org:** ZenHive
+
+> **Cross-family reviewers:** the `.json` mix tasks (`mix test.json`, `mix dialyzer.json`) emit JSON **by design** — parse it for real failures, never flag the envelope as a build error. Full toolchain/check-command contract for codex/cursor/grok reviewers is in `AGENTS.md` § "Toolchain & check commands".
 
 ## Commands
 

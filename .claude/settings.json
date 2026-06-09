@@ -1,15 +1,21 @@
 {
   "extraKnownMarketplaces": {
-    "deltahedge": {
-      "source": { "source": "github", "repo": "ZenHive/claude-marketplace-elixir" }
+    "zenhive": {
+      "source": {
+        "source": "github",
+        "repo": "ZenHive/claude-marketplace"
+      }
     },
     "nethermind-defi-skills": {
-      "source": { "source": "github", "repo": "NethermindEth/defi-skills" }
+      "source": {
+        "source": "github",
+        "repo": "NethermindEth/defi-skills"
+      }
     }
   },
   "enabledPlugins": {
-    "elixir@deltahedge": true,
-    "elixir-workflows@deltahedge": true,
+    "elixir@zenhive": true,
+    "elixir-workflows@zenhive": true,
     "defi-skills@nethermind-defi-skills": true
   }
 }
