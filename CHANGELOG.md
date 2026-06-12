@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.3.0
+
+### Dependency updates
+
+- Moved to the descripex-0.9 / onchain-0.8 line: `onchain` `~> 0.7.0` → `~> 0.8`,
+  `descripex` `~> 0.7` → `~> 0.9`. onchain 0.8.0 relaxes its own descripex/cartouche
+  floors to the same line; descripex 0.8/0.9 are additive (spec-derived JSON Schema)
+  and the descripex 0.9.1 `safe_convert` fix keeps manifest/`describe` from crashing on
+  unconvertible spec types. No onchain_tempo code changes — compile clean under
+  `--warnings-as-errors`, 95 offline tests green against the new chain.
+
 ## v0.2.2
 
 ### Dependency updates
