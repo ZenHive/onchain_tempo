@@ -10,8 +10,8 @@
   the fee token, but gas can land first — polling native balance could return
   before the pathUSD the caller actually needs had arrived. The poll now waits on
   the balance of interest, independent of gas-vs-pathUSD landing order.
-- New `:fee_token` option (hex address) on `fund_address/2` / `fresh_funded_wallet/1`
-  overrides the polled token; defaults to Moderato's pathUSD
+- New `:fee_token` option (hex address) on `fresh_funded_wallet/1` overrides the
+  polled token; defaults to Moderato's pathUSD
   (`0x20c0000000000000000000000000000000000000`).
 - **New public API:** `Onchain.Tempo.TIP20.balance_of_selector/0` (`0x70a08231`)
   and `Onchain.Tempo.TIP20.balance_of_calldata/1` encode `balanceOf(address)`.
