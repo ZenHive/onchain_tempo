@@ -40,6 +40,9 @@ defmodule Onchain.Tempo.TIP20 do
   # swapExactAmountOut(address,address,uint128,uint128)
   @swap_exact_amount_out_selector <<0xF0, 0x12, 0x2B, 0x75>>
 
+  # balanceOf(address)
+  @balance_of_selector <<0x70, 0xA0, 0x82, 0x31>>
+
   # Tempo stablecoin DEX contract address (canonical, from viem/tempo).
   @stablecoin_dex_address <<0xDE, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                             0x00, 0x00, 0x00, 0x00, 0x00>>
@@ -59,6 +62,10 @@ defmodule Onchain.Tempo.TIP20 do
   @doc "Returns the `swapExactAmountOut(address,address,uint128,uint128)` function selector."
   @spec swap_exact_amount_out_selector() :: <<_::32>>
   def swap_exact_amount_out_selector, do: @swap_exact_amount_out_selector
+
+  @doc "Returns the `balanceOf(address)` function selector."
+  @spec balance_of_selector() :: <<_::32>>
+  def balance_of_selector, do: @balance_of_selector
 
   @doc "Returns the canonical Tempo stablecoin DEX contract address (20-byte binary)."
   @spec stablecoin_dex_address() :: <<_::160>>
@@ -108,6 +115,18 @@ defmodule Onchain.Tempo.TIP20 do
   def approve_calldata(spender, amount)
       when is_binary(spender) and byte_size(spender) == 20 and is_integer(amount) and amount >= 0 do
     @approve_selector <> <<0::96, spender::binary-size(20), amount::unsigned-big-size(256)>>
+  end
+
+  @doc """
+  ABI-encode `balanceOf(address)` calldata.
+
+  ## Parameters
+
+    * `owner` — 20-byte binary address whose balance to query
+  """
+  @spec balance_of_calldata(<<_::160>>) :: binary()
+  def balance_of_calldata(owner) when is_binary(owner) and byte_size(owner) == 20 do
+    @balance_of_selector <> <<0::96, owner::binary-size(20)>>
   end
 
   @doc """

@@ -36,15 +36,24 @@ defmodule Onchain.Tempo.Faucet do
     * `:settle_ms` — maximum milliseconds to wait for the funding transaction
       to confirm. Defaults to `10_000`. Set to `0` to skip the wait entirely
       (used by unit tests that mock the RPC layer).
-    * `:poll_interval_ms` — interval between `eth_getBalance` polls. Defaults
-      to `200`.
+    * `:poll_interval_ms` — interval between balance polls. Defaults to `200`.
+    * `:fee_token` — hex address of the fee token to poll for funding (via an
+      `eth_call` of `balanceOf`). Defaults to Moderato's pathUSD. The faucet
+      funds native gas *and* the fee token, but gas can land first; polling the
+      fee token confirms the balance the caller actually needs has arrived.
   """
+  alias Onchain.Tempo.TIP20
+
   # Jason, Req are transitive deps via onchain — not resolved in PLT with path deps
   @dialyzer [:no_unknown]
 
   @default_rpc_url "https://rpc.moderato.tempo.xyz"
   @default_wait_timeout_ms 10_000
   @default_poll_interval_ms 200
+
+  # Canonical pathUSD TIP-20 stablecoin on Moderato — the fee token the faucet
+  # funds alongside native gas. Override with the `:fee_token` option.
+  @default_fee_token "0x20c0000000000000000000000000000000000000"
 
   @doc """
   RPC URL used by the faucet by default — `TEMPO_RPC_URL` env var if set,
@@ -73,7 +82,10 @@ defmodule Onchain.Tempo.Faucet do
 
   @doc """
   Generate a fresh 32-byte keypair, fund it via `tempo_fundAddress`, and poll
-  `eth_getBalance` until the funding transaction lands on-chain.
+  the fee token's `balanceOf` (via `eth_call`) until the funding lands on-chain.
+  The faucet credits native gas *and* the fee token, but gas can confirm first;
+  polling the fee token (pathUSD by default) confirms the balance callers
+  actually need has arrived. Override the token with `:fee_token`.
 
   Returns the wallet as a map with `:private_key` (32 bytes), `:address_hex`
   (`"0x"` + 40 hex), and `:address_bin` (20 bytes).
@@ -125,16 +137,27 @@ defmodule Onchain.Tempo.Faucet do
       :ok
     else
       interval_ms = Keyword.get(opts, :poll_interval_ms, @default_poll_interval_ms)
-      {url, rpc_opts} = Keyword.pop(opts, :rpc_url, rpc_url())
+      {url, opts} = Keyword.pop(opts, :rpc_url, rpc_url())
+      {fee_token, rpc_opts} = Keyword.pop(opts, :fee_token, @default_fee_token)
+      data_hex = balance_of_data(addr_hex)
       deadline = System.monotonic_time(:millisecond) + timeout_ms
-      poll_balance(addr_hex, url, rpc_opts, deadline, interval_ms, timeout_ms)
+      poll_balance(fee_token, data_hex, url, rpc_opts, deadline, interval_ms, timeout_ms)
     end
   end
 
-  @spec poll_balance(String.t(), String.t(), keyword(), integer(), pos_integer(), pos_integer()) ::
+  # Build the `balanceOf(owner)` calldata (hex) for the address being funded.
+  @spec balance_of_data(String.t()) :: String.t()
+  defp balance_of_data(addr_hex) do
+    addr_bin = addr_hex |> String.trim_leading("0x") |> Base.decode16!(case: :mixed)
+    "0x" <> Base.encode16(TIP20.balance_of_calldata(addr_bin), case: :lower)
+  end
+
+  @spec poll_balance(String.t(), String.t(), String.t(), keyword(), integer(), pos_integer(), pos_integer()) ::
           :ok | {:error, String.t()}
-  defp poll_balance(addr_hex, url, opts, deadline, interval_ms, timeout_ms) do
-    with {:ok, balance_hex} <- rpc_request("eth_getBalance", [addr_hex, "latest"], url, opts),
+  defp poll_balance(fee_token, data_hex, url, opts, deadline, interval_ms, timeout_ms) do
+    params = [%{to: fee_token, data: data_hex}, "latest"]
+
+    with {:ok, balance_hex} <- rpc_request("eth_call", params, url, opts),
          {:ok, balance} <- parse_balance_hex(balance_hex) do
       now = System.monotonic_time(:millisecond)
 
@@ -151,7 +174,7 @@ defmodule Onchain.Tempo.Faucet do
           # yield to the scheduler when budget is nearly exhausted.
           remaining = deadline - now
           Process.sleep(max(min(interval_ms, remaining), 1))
-          poll_balance(addr_hex, url, opts, deadline, interval_ms, timeout_ms)
+          poll_balance(fee_token, data_hex, url, opts, deadline, interval_ms, timeout_ms)
       end
     end
   end
@@ -160,11 +183,11 @@ defmodule Onchain.Tempo.Faucet do
   defp parse_balance_hex("0x" <> hex) do
     case Integer.parse(hex, 16) do
       {n, ""} when n >= 0 -> {:ok, n}
-      _ -> {:error, "unexpected eth_getBalance result: #{inspect("0x" <> hex)}"}
+      _ -> {:error, "unexpected eth_call result: #{inspect("0x" <> hex)}"}
     end
   end
 
-  defp parse_balance_hex(other), do: {:error, "unexpected eth_getBalance result: #{inspect(other)}"}
+  defp parse_balance_hex(other), do: {:error, "unexpected eth_call result: #{inspect(other)}"}
 
   @spec rpc_request(String.t(), list(), String.t(), keyword()) ::
           {:ok, term()} | {:error, String.t()}
