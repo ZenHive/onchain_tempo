@@ -1,7 +1,7 @@
 defmodule OnchainTempo.MixProject do
   use Mix.Project
 
-  @version "0.3.0"
+  @version "0.4.0"
   @source_url "https://github.com/ZenHive/onchain_tempo"
 
   def project do
@@ -38,7 +38,7 @@ defmodule OnchainTempo.MixProject do
 
   defp deps do
     [
-      {:onchain, "~> 0.8"},
+      {:onchain, "~> 0.9"},
       {:req, "~> 0.5"},
       {:jason, "~> 1.4"},
       {:descripex, "~> 0.9"},

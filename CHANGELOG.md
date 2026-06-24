@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.4.0
+
+### Per-transaction gas estimation
+
+- `Onchain.Tempo.Transaction.Builder` now estimates gas per transaction via
+  `eth_estimateGas` (with a 1.25× safety headroom) when `:gas_limit` is omitted,
+  instead of a static `@default_gas_limit`. The static default went stale twice —
+  a cold-storage TIP-20 transfer on Moderato measures ~560k–810k (the chain
+  charges a protocol fee on the transfer path) and OOG-reverted at the old 500k.
+  Estimation mirrors `Onchain.Signer`: per-call estimates are summed, headroom is
+  applied, and a failed estimate propagates as `{:error, _}` — never a silent
+  fallback. An explicit `:gas_limit` is still honored verbatim with no RPC call.
+- **Behavior change:** building with `:gas_limit` omitted now performs an RPC
+  round-trip and requires a reachable node; previously it used an offline default.
+- Requires `onchain ~> 0.9` (`Onchain.RPC.eth_estimate_gas/2`); floor raised from
+  `~> 0.8`.
+
 ## v0.3.0
 
 ### Dependency updates

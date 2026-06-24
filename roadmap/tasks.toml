@@ -210,7 +210,7 @@ implemented = "Adopted plt_add_deps: :apps_direct to scope the PLT to direct dep
 id = 10
 phase = 3
 bundle = "integration_coverage"
-status = "pending"
+status = "done"
 title = "Stop hardcoding Builder @default_gas_limit — estimate gas per-tx (mirror mppx)"
 scores = { d = 3, b = 4, u = 6 }
 acceptance_criteria = ["Builder estimates gas via eth_estimateGas when :gas_limit is omitted, with a headroom multiplier", "A cold-storage TIP-20 transfer / transferWithMemo on Moderato no longer OOG-reverts at the default", "An explicit :gas_limit override is still honored unchanged", "Interim: if estimation is deferred, @default_gas_limit is raised to >= 1_000_000 with a comment citing the ~560k measured cost"]
@@ -219,6 +219,29 @@ body = """
 `Onchain.Tempo.Transaction.Builder` `@default_gas_limit` (currently 500_000, raised from 200_000 in Task 4 for the then-"~272k" cold TIP-20 transfer) is stale again: a cold-storage TIP-20 transfer on Moderato now measures ~560k, because the chain charges a protocol fee (a Transfer to the `0xfeec…` collector) on the transfer path. At the 500k default these transfers OOG-revert (`gas_used == gas_limit`, status 0) — empirically confirmed: identical transfer reverts at 400k/500k, succeeds at 2M using 560019 gas. This is the second time a static default went stale; the constant chases a moving on-chain number.
 
 Mirror the reference SDK (mppx sizes every transaction via `eth_estimateGas`, not a constant): have the Builder estimate gas per transaction (consuming the `eth_estimateGas` helper being added to `onchain` — cross-repo dependency) with a safety headroom multiplier, instead of a fixed default. Keep an explicit `:gas_limit` override working. As an interim until estimation lands, raise `@default_gas_limit` to >= 1_000_000 (> the measured 560k, < the mppx fee-payer `maxGas` ceiling of 2_000_000) so cold transfers stop reverting.
+"""
+implemented = "Builder estimates gas per-tx via Onchain.RPC.eth_estimate_gas (1.25x headroom) when :gas_limit omitted; per-call summed, errors propagate, explicit override honored. Probed Moderato: cold eth_estimateGas=807k captures the protocol fee, so standard estimation suffices. onchain floor ~> 0.9. 21 offline + 4 live Moderato tests (incl. cold transfer confirms), Builder 100% cover."
+verified = true
+created_at = "2026-06-24"
+scored_at = "2026-06-24"
+done_at = "2026-06-24"
+
+[[task]]
+id = 11
+phase = 3
+bundle = "cartouche_migration"
+status = "pending"
+title = "Update transport stub off the :cartouche,:client seam after onchain's Req migration"
+scores = { d = 2, b = 5, u = 5 }
+acceptance_criteria = ["builder_estimate_test.exs no longer references :cartouche, :client", "It stubs the onchain RPC transport via onchain's post-migration mechanism and passes", "mix.exs onchain requirement covers the migrated onchain version", "Full offline suite green"]
+out_of_scope = ["The onchain transport migration itself (its own roadmap task — must ship first)", "Any cartouche change"]
+domains = ["transaction"]
+assignee = "cursor"
+model = "composer-2.5"
+body = """
+Follow-on to onchain's transport migration (onchain roadmap task: "Migrate HTTP transport off cartouche's removed Finch seams"). cartouche 0.5.0 dropped the `config :cartouche, :client` seam and onchain is moving its own transport off it; once onchain ships, `test/onchain/tempo/transaction/builder_estimate_test.exs` no longer works — it stubs the onchain RPC transport by toggling `Application.{get,put,delete}_env(:cartouche, :client, module)` (its `setup`/`restore_client` helpers, lines ~44-51, plus the `async: false` comment at the top explaining the global-seam toggle).
+
+After onchain ships its new transport-stub seam (Req.Test / function plug, or onchain's own override key), rewrite this test's stubbing to use that mechanism instead of `:cartouche, :client`. Bump the `{:onchain, ...}` requirement in mix.exs to the version that ships the migration if onchain raises its version. Keep the test's intent unchanged (it asserts builder gas-estimate behavior against a stubbed RPC).
 """
 created_at = "2026-06-24"
 scored_at = "2026-06-24"

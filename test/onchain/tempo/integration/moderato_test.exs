@@ -70,4 +70,24 @@ defmodule Onchain.Tempo.Integration.ModeratoTest do
     assert {:ok, "0x" <> _hash, %{status: 1, logs: logs}} = RPC.broadcast_sync(raw, rpc)
     refute Enum.empty?(logs)
   end
+
+  test "cold transfer to a fresh recipient confirms with auto-estimated gas", %{wallet: w, rpc_url: rpc} do
+    # Fresh recipient => cold storage init on the transfer path, where a static
+    # 500k default OOG-reverts. With :gas_limit omitted the Builder estimates per
+    # tx via eth_estimateGas (+headroom), so the cold transfer must confirm.
+    fresh_recipient = :crypto.strong_rand_bytes(20)
+
+    {:ok, raw} =
+      Builder.build_signed_transfer(
+        private_key: w.private_key,
+        token: @path_usd,
+        recipient: fresh_recipient,
+        amount: 1,
+        chain_id: @chain_id,
+        rpc_url: rpc,
+        fee_token: @path_usd
+      )
+
+    assert {:ok, "0x" <> _hash, %{status: 1}} = RPC.broadcast_sync(raw, rpc)
+  end
 end

@@ -22,7 +22,8 @@ defmodule Onchain.Tempo.Transaction.Builder do
 
   Uses `Cartouche.Signer.Curvy` for signing (keccak + secp256k1),
   `Cartouche.Recover` for recovery bit, `ExRLP` for RLP encoding, and
-  `Onchain.RPC` for nonce fetching. All available transitively via `onchain`.
+  `Onchain.RPC` for nonce fetching and gas estimation. All available
+  transitively via `onchain`.
   """
   alias Cartouche.Signer.Curvy
   alias Onchain.Tempo.TIP20
@@ -30,12 +31,17 @@ defmodule Onchain.Tempo.Transaction.Builder do
   # EIP-2718 type byte for Tempo Transactions.
   @tempo_tx_type 0x76
 
-  # Default gas parameters for testnet transfers.
+  # Default fee parameters for testnet transfers.
   # Moderato base fee is 20 gwei minimum — use 25 gwei for headroom.
-  # 500k covers a stock TIP-20 transfer (~272k on Moderato) with margin.
-  @default_gas_limit 500_000
   @default_max_fee_per_gas 25_000_000_000
   @default_max_priority_fee_per_gas 1_000_000_000
+
+  # Gas-limit safety headroom applied to an eth_estimateGas result (5/4 = 1.25×),
+  # so a transaction is not sized exactly at the node's estimate. A cold TIP-20
+  # transfer on Moderato measures ~560k–810k (the chain charges a protocol fee on
+  # the transfer path), so a static default went stale twice — estimate per tx.
+  @gas_headroom_numerator 5
+  @gas_headroom_denominator 4
 
   @dialyzer {:nowarn_function, [build_signed_transfer: 1, build_signed_multicall: 1, rlp_encode: 1]}
 
@@ -56,7 +62,8 @@ defmodule Onchain.Tempo.Transaction.Builder do
     * `:fee_token` — token address for fee payment (hex); defaults to `:token` value
     * `:nonce_key` — 2D nonce lane (integer, default 0)
     * `:nonce` — explicit nonce (skips RPC fetch if provided)
-    * `:gas_limit` — gas limit (default #{@default_gas_limit})
+    * `:gas_limit` — explicit gas limit; when omitted, gas is auto-estimated per
+      call via `eth_estimateGas`, summed, with a 1.25× safety headroom
     * `:valid_before` — Unix timestamp (default 0 = no expiry)
     * `:valid_after` — Unix timestamp (default 0)
 
@@ -75,14 +82,13 @@ defmodule Onchain.Tempo.Transaction.Builder do
          {:ok, rpc_url} <- require_opt(opts, :rpc_url, &validate_non_empty_binary(:rpc_url, &1)),
          {:ok, fee_token} <- optional_opt(opts, :fee_token, token, &decode_address(:fee_token, &1)),
          {:ok, nonce_key} <- optional_opt(opts, :nonce_key, 0, &validate_uint(:nonce_key, &1)),
-         {:ok, gas_limit} <- optional_opt(opts, :gas_limit, @default_gas_limit, &validate_uint(:gas_limit, &1)),
          {:ok, valid_before} <- optional_opt(opts, :valid_before, 0, &validate_uint(:valid_before, &1)),
          {:ok, valid_after} <- optional_opt(opts, :valid_after, 0, &validate_uint(:valid_after, &1)),
          {:ok, sender_address} <- Curvy.get_address(private_key),
-         {:ok, nonce} <- resolve_nonce(opts, sender_address, rpc_url) do
-      calldata = TIP20.transfer_calldata(recipient, amount)
-      call = [token, <<>>, calldata]
-
+         {:ok, nonce} <- resolve_nonce(opts, sender_address, rpc_url),
+         calldata = TIP20.transfer_calldata(recipient, amount),
+         call = [token, <<>>, calldata],
+         {:ok, gas_limit} <- resolve_gas_limit(opts, [call], sender_address, rpc_url) do
       base_fields = [
         encode_uint(chain_id),
         encode_uint(@default_max_priority_fee_per_gas),
@@ -118,7 +124,8 @@ defmodule Onchain.Tempo.Transaction.Builder do
 
     * `:nonce_key` — 2D nonce lane (integer, default 0)
     * `:nonce` — explicit nonce (skips RPC fetch if provided)
-    * `:gas_limit` — gas limit (default #{@default_gas_limit})
+    * `:gas_limit` — explicit gas limit; when omitted, gas is auto-estimated per
+      call via `eth_estimateGas`, summed, with a 1.25× safety headroom
     * `:valid_before` — Unix timestamp (default 0 = no expiry)
     * `:valid_after` — Unix timestamp (default 0)
 
@@ -135,11 +142,11 @@ defmodule Onchain.Tempo.Transaction.Builder do
          {:ok, rpc_url} <- require_opt(opts, :rpc_url, &validate_non_empty_binary(:rpc_url, &1)),
          {:ok, fee_token} <- require_opt(opts, :fee_token, &decode_address(:fee_token, &1)),
          {:ok, nonce_key} <- optional_opt(opts, :nonce_key, 0, &validate_uint(:nonce_key, &1)),
-         {:ok, gas_limit} <- optional_opt(opts, :gas_limit, @default_gas_limit, &validate_uint(:gas_limit, &1)),
          {:ok, valid_before} <- optional_opt(opts, :valid_before, 0, &validate_uint(:valid_before, &1)),
          {:ok, valid_after} <- optional_opt(opts, :valid_after, 0, &validate_uint(:valid_after, &1)),
          {:ok, sender_address} <- Curvy.get_address(private_key),
-         {:ok, nonce} <- resolve_nonce(opts, sender_address, rpc_url) do
+         {:ok, nonce} <- resolve_nonce(opts, sender_address, rpc_url),
+         {:ok, gas_limit} <- resolve_gas_limit(opts, calls, sender_address, rpc_url) do
       base_fields = [
         encode_uint(chain_id),
         encode_uint(@default_max_priority_fee_per_gas),
@@ -179,14 +186,13 @@ defmodule Onchain.Tempo.Transaction.Builder do
          {:ok, chain_id} <- require_opt(opts, :chain_id, &validate_uint(:chain_id, &1)),
          {:ok, rpc_url} <- require_opt(opts, :rpc_url, &validate_non_empty_binary(:rpc_url, &1)),
          {:ok, nonce_key} <- optional_opt(opts, :nonce_key, 0, &validate_uint(:nonce_key, &1)),
-         {:ok, gas_limit} <- optional_opt(opts, :gas_limit, @default_gas_limit, &validate_uint(:gas_limit, &1)),
          {:ok, valid_before} <- optional_opt(opts, :valid_before, 0, &validate_uint(:valid_before, &1)),
          {:ok, valid_after} <- optional_opt(opts, :valid_after, 0, &validate_uint(:valid_after, &1)),
          {:ok, sender_address} <- Curvy.get_address(private_key),
-         {:ok, nonce} <- resolve_nonce(opts, sender_address, rpc_url) do
-      calldata = TIP20.transfer_calldata(recipient, amount)
-      call = [token, <<>>, calldata]
-
+         {:ok, nonce} <- resolve_nonce(opts, sender_address, rpc_url),
+         calldata = TIP20.transfer_calldata(recipient, amount),
+         call = [token, <<>>, calldata],
+         {:ok, gas_limit} <- resolve_gas_limit(opts, [call], sender_address, rpc_url) do
       base_fields = [
         encode_uint(chain_id),
         encode_uint(@default_max_priority_fee_per_gas),
@@ -220,11 +226,11 @@ defmodule Onchain.Tempo.Transaction.Builder do
          {:ok, chain_id} <- require_opt(opts, :chain_id, &validate_uint(:chain_id, &1)),
          {:ok, rpc_url} <- require_opt(opts, :rpc_url, &validate_non_empty_binary(:rpc_url, &1)),
          {:ok, nonce_key} <- optional_opt(opts, :nonce_key, 0, &validate_uint(:nonce_key, &1)),
-         {:ok, gas_limit} <- optional_opt(opts, :gas_limit, @default_gas_limit, &validate_uint(:gas_limit, &1)),
          {:ok, valid_before} <- optional_opt(opts, :valid_before, 0, &validate_uint(:valid_before, &1)),
          {:ok, valid_after} <- optional_opt(opts, :valid_after, 0, &validate_uint(:valid_after, &1)),
          {:ok, sender_address} <- Curvy.get_address(private_key),
-         {:ok, nonce} <- resolve_nonce(opts, sender_address, rpc_url) do
+         {:ok, nonce} <- resolve_nonce(opts, sender_address, rpc_url),
+         {:ok, gas_limit} <- resolve_gas_limit(opts, calls, sender_address, rpc_url) do
       base_fields = [
         encode_uint(chain_id),
         encode_uint(@default_max_priority_fee_per_gas),
@@ -289,6 +295,50 @@ defmodule Onchain.Tempo.Transaction.Builder do
     end
   end
 
+  # Resolves the gas limit. An explicit `:gas_limit` is honored verbatim with no
+  # RPC. When omitted, every call is sized via `eth_estimateGas` (from the sender's
+  # address), the estimates are summed, and a safety headroom is applied. A failed
+  # estimate propagates as an error — never a silent fallback to a static default.
+  defp resolve_gas_limit(opts, calls, sender_address, rpc_url) do
+    case Keyword.fetch(opts, :gas_limit) do
+      {:ok, gas_limit} -> validate_uint(:gas_limit, gas_limit)
+      :error -> estimate_gas(calls, sender_address, rpc_url)
+    end
+  end
+
+  # Sums per-call `eth_estimateGas` results and applies the headroom multiplier.
+  # Independent per-call estimation over-counts the shared intrinsic base (safe —
+  # never under-estimates a batch); callers with state-dependent batches that an
+  # isolated estimate would revert must pass an explicit `:gas_limit`.
+  defp estimate_gas(calls, sender_address, rpc_url) do
+    from_hex = "0x" <> Base.encode16(sender_address, case: :lower)
+
+    calls
+    |> Enum.reduce_while({:ok, 0}, fn [to, value, input], {:ok, acc} ->
+      params = %{
+        from: from_hex,
+        to: "0x" <> Base.encode16(to, case: :lower),
+        data: "0x" <> Base.encode16(input, case: :lower),
+        value: :binary.decode_unsigned(value)
+      }
+
+      case Onchain.RPC.eth_estimate_gas(params, rpc_url: rpc_url) do
+        {:ok, gas} -> {:cont, {:ok, acc + gas}}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, total} -> {:ok, apply_headroom(total)}
+      {:error, _} = error -> error
+    end
+  end
+
+  # Applies the gas safety headroom via integer ceil math (integer math avoids
+  # float-precision loss on a large node estimate): ceil(gas * numerator / denominator).
+  defp apply_headroom(gas) do
+    div(gas * @gas_headroom_numerator + @gas_headroom_denominator - 1, @gas_headroom_denominator)
+  end
+
   # Encodes an unsigned integer as a big-endian binary (RLP convention: 0 → <<>>).
   defp encode_uint(0), do: <<>>
   defp encode_uint(n) when is_integer(n) and n > 0, do: :binary.encode_unsigned(n)
@@ -323,7 +373,17 @@ defmodule Onchain.Tempo.Transaction.Builder do
   defp validate_non_empty_binary(_key, value) when is_binary(value) and byte_size(value) > 0, do: {:ok, value}
   defp validate_non_empty_binary(key, _value), do: {:error, "invalid #{key}: expected non-empty string"}
 
-  defp validate_calls([_ | _] = calls), do: {:ok, calls}
+  defp validate_calls([_ | _] = calls) do
+    if Enum.all?(
+         calls,
+         &match?([to, value, input] when is_binary(to) and is_binary(value) and is_binary(input), &1)
+       ) do
+      {:ok, calls}
+    else
+      {:error, "invalid calls: each call must be [to, value, input] binaries"}
+    end
+  end
+
   defp validate_calls(_), do: {:error, "invalid calls: expected non-empty list"}
 
   # ExRLP wrapper — suppresses dialyzer false positive from default-arg arity mismatch.

@@ -20,6 +20,9 @@ defmodule Onchain.Tempo.Transaction.BuilderTest do
       assert {:ok, tx} = Transaction.deserialize(tx_hex)
       assert tx.chain_id == @chain_id
 
+      # Explicit :gas_limit is honored verbatim (gas_limit is field index 3).
+      assert :binary.decode_unsigned(Enum.at(tx.fields, 3)) == 500_000
+
       assert {:ok, match} =
                Transaction.find_payment_call(tx, @token,
                  amount: Integer.to_string(@amount),
@@ -112,6 +115,90 @@ defmodule Onchain.Tempo.Transaction.BuilderTest do
     end
   end
 
+  # Explicit gas_limit keeps these tests hermetic (no eth_estimateGas RPC) and
+  # exercises the explicit-override path. The estimation path is covered in
+  # BuilderEstimateTest (stubbed) and the Moderato integration suite (live).
+  describe "build_fee_payer_multicall/1" do
+    test "builds a fee-payer multicall with placeholder fields" do
+      token_bin = Base.decode16!("20c0000000000000000000000000000000000000", case: :lower)
+      calls = [[token_bin, <<>>, Base.decode16!("a9059cbb", case: :lower)]]
+
+      opts = [
+        private_key: @private_key,
+        calls: calls,
+        chain_id: @chain_id,
+        rpc_url: @rpc_url,
+        nonce: 0,
+        gas_limit: 500_000
+      ]
+
+      assert {:ok, tx_hex} = Builder.build_fee_payer_multicall(opts)
+      assert {:ok, tx} = Transaction.deserialize(tx_hex)
+      assert Transaction.has_fee_payer_placeholder?(tx)
+      assert Transaction.fee_token_empty?(tx)
+    end
+
+    test "returns error for empty calls list" do
+      opts = [private_key: @private_key, calls: [], chain_id: @chain_id, rpc_url: @rpc_url, nonce: 0]
+
+      assert {:error, "invalid calls: expected non-empty list"} =
+               Builder.build_fee_payer_multicall(opts)
+    end
+
+    test "returns error for a malformed call entry" do
+      token_bin = Base.decode16!("20c0000000000000000000000000000000000000", case: :lower)
+
+      opts = [
+        private_key: @private_key,
+        calls: [[token_bin]],
+        chain_id: @chain_id,
+        rpc_url: @rpc_url,
+        nonce: 0
+      ]
+
+      assert {:error, "invalid calls: each call must be [to, value, input] binaries"} =
+               Builder.build_fee_payer_multicall(opts)
+    end
+  end
+
+  describe "input normalization and error branches" do
+    test "accepts raw-binary private key and addresses" do
+      opts = [
+        private_key: Base.decode16!("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", case: :lower),
+        token: Base.decode16!("20c0000000000000000000000000000000000000", case: :lower),
+        recipient: Base.decode16!("70997970c51812dc3a010c7d01b50e0d17dc79c8", case: :lower),
+        amount: @amount,
+        chain_id: @chain_id,
+        rpc_url: @rpc_url,
+        nonce: 0,
+        gas_limit: 500_000
+      ]
+
+      assert {:ok, "0x76" <> _} = Builder.build_signed_transfer(opts)
+    end
+
+    test "rejects a 64-char non-hex private key" do
+      opts = Keyword.put(valid_opts(), :private_key, String.duplicate("z", 64))
+
+      assert {:error, "invalid private_key: expected 32-byte hex string"} =
+               Builder.build_signed_transfer(opts)
+    end
+
+    test "rejects a 40-char non-hex address" do
+      opts = Keyword.put(valid_opts(), :recipient, "0x" <> String.duplicate("z", 40))
+
+      assert {:error, "invalid recipient: expected 20-byte hex address"} =
+               Builder.build_signed_transfer(opts)
+    end
+
+    test "rejects an empty rpc_url" do
+      opts = Keyword.put(valid_opts(), :rpc_url, "")
+
+      assert {:error, "invalid rpc_url: expected non-empty string"} =
+               Builder.build_signed_transfer(opts)
+    end
+  end
+
   defp valid_opts do
     [
       private_key: @private_key,
@@ -120,7 +207,8 @@ defmodule Onchain.Tempo.Transaction.BuilderTest do
       amount: @amount,
       chain_id: @chain_id,
       rpc_url: @rpc_url,
-      nonce: 0
+      nonce: 0,
+      gas_limit: 500_000
     ]
   end
 end
