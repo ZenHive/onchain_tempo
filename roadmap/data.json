@@ -72,6 +72,7 @@
       },
       "eff": 1.25,
       "dep_layer": 0,
+      "unlocks": 0,
       "markers": [],
       "depends_on": [],
       "shipped_in": "v0.1.0",
@@ -95,6 +96,7 @@
       },
       "eff": 4.0,
       "dep_layer": 0,
+      "unlocks": 0,
       "markers": [],
       "depends_on": [],
       "shipped_in": "v0.1.0",
@@ -118,6 +120,7 @@
       },
       "eff": 2.17,
       "dep_layer": 0,
+      "unlocks": 0,
       "markers": [],
       "depends_on": [],
       "shipped_in": "v0.1.1",
@@ -141,6 +144,7 @@
       },
       "eff": 4.0,
       "dep_layer": 0,
+      "unlocks": 0,
       "markers": [],
       "depends_on": [],
       "shipped_in": "v0.1.1",
@@ -164,6 +168,7 @@
       },
       "eff": 2.83,
       "dep_layer": 0,
+      "unlocks": 0,
       "markers": [],
       "depends_on": [],
       "shipped_in": "v0.1.1",
@@ -187,6 +192,7 @@
       },
       "eff": 1.0,
       "dep_layer": 0,
+      "unlocks": 0,
       "markers": [],
       "depends_on": [],
       "acceptance_criteria": [
@@ -219,6 +225,7 @@
       },
       "eff": 2.5,
       "dep_layer": 0,
+      "unlocks": 0,
       "markers": [],
       "depends_on": [],
       "shipped_in": "v0.2.0",
@@ -242,6 +249,7 @@
       },
       "eff": 2.75,
       "dep_layer": 0,
+      "unlocks": 0,
       "markers": [],
       "depends_on": [],
       "shipped_in": "v0.2.1",
@@ -265,6 +273,7 @@
       },
       "eff": 2.75,
       "dep_layer": 0,
+      "unlocks": 0,
       "markers": [],
       "depends_on": [],
       "shipped_in": "v0.2.1",
@@ -273,6 +282,37 @@
       "done_at": "2026-05-15",
       "scored_at": "2026-05-15",
       "implemented": "Adopted plt_add_deps: :apps_direct to scope the PLT to direct deps (avoiding OOM on the bloated tidewave/bandit tree) and moved PLT files to priv/plts/ (gitignored) so they survive mix clean. Shipped in v0.2.1.",
+      "cross_repo": []
+    },
+    {
+      "id": 10,
+      "phase": 3,
+      "bundle": "integration_coverage",
+      "status": "pending",
+      "title": "Stop hardcoding Builder @default_gas_limit — estimate gas per-tx (mirror mppx)",
+      "scores": {
+        "d": 3,
+        "b": 4,
+        "u": 6
+      },
+      "eff": 1.67,
+      "dep_layer": 0,
+      "unlocks": 0,
+      "markers": [],
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Builder estimates gas via eth_estimateGas when :gas_limit is omitted, with a headroom multiplier",
+        "A cold-storage TIP-20 transfer / transferWithMemo on Moderato no longer OOG-reverts at the default",
+        "An explicit :gas_limit override is still honored unchanged",
+        "Interim: if estimation is deferred, @default_gas_limit is raised to >= 1_000_000 with a comment citing the ~560k measured cost"
+      ],
+      "out_of_scope": [
+        "Adding the eth_estimateGas RPC wrapper itself (tracked in onchain's roadmap)",
+        "Faucet funding changes — empirically pathUSD + gas both land before tempo_fundAddress returns; no race (Task 6 poll loop already sufficient)"
+      ],
+      "body": "`Onchain.Tempo.Transaction.Builder` `@default_gas_limit` (currently 500_000, raised from 200_000 in Task 4 for the then-\"~272k\" cold TIP-20 transfer) is stale again: a cold-storage TIP-20 transfer on Moderato now measures ~560k, because the chain charges a protocol fee (a Transfer to the `0xfeec…` collector) on the transfer path. At the 500k default these transfers OOG-revert (`gas_used == gas_limit`, status 0) — empirically confirmed: identical transfer reverts at 400k/500k, succeeds at 2M using 560019 gas. This is the second time a static default went stale; the constant chases a moving on-chain number.\n\nMirror the reference SDK (mppx sizes every transaction via `eth_estimateGas`, not a constant): have the Builder estimate gas per transaction (consuming the `eth_estimateGas` helper being added to `onchain` — cross-repo dependency) with a safety headroom multiplier, instead of a fixed default. Keep an explicit `:gas_limit` override working. As an interim until estimation lands, raise `@default_gas_limit` to >= 1_000_000 (> the measured 560k, < the mppx fee-payer `maxGas` ceiling of 2_000_000) so cold transfers stop reverting.\n",
+      "created_at": "2026-06-24",
+      "scored_at": "2026-06-24",
       "cross_repo": []
     }
   ]
