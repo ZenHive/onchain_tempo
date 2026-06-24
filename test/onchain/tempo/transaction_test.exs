@@ -3,7 +3,9 @@ defmodule Onchain.Tempo.TransactionTest do
 
   import Onchain.Tempo.TestHelpers
 
+  alias Cartouche.Signer.Curvy
   alias Onchain.Tempo.Transaction
+  alias Onchain.Tempo.Transaction.Builder
 
   # Test addresses (Hardhat default accounts — testnet only, no security concern)
   @recipient_hex "0x70997970c51812dc3a010c7d01b50e0d17dc79c8"
@@ -536,6 +538,100 @@ defmodule Onchain.Tempo.TransactionTest do
         ])
 
       assert {:error, "disallowed call pattern" <> _} = Transaction.validate_call_scope(tx)
+    end
+  end
+
+  # --- sender/1 and simulate_request/1 tests ---
+
+  describe "sender/1 and simulate_request/1" do
+    # Hardhat default accounts (testnet only, no security concern).
+    @client_key Base.decode16!("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", case: :lower)
+    @fee_payer_key Base.decode16!("59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d", case: :lower)
+    @fee_token_bin Base.decode16!("20c0000000000000000000000000000000000000", case: :lower)
+
+    defp cosigned_transfer(opts) do
+      defaults = [
+        private_key: @client_key,
+        token: @token_hex,
+        recipient: @recipient_hex,
+        amount: 1,
+        chain_id: @moderato_chain_id,
+        rpc_url: "http://localhost",
+        nonce: 7,
+        gas_limit: 100_000
+      ]
+
+      {:ok, raw} = Builder.build_fee_payer_transfer(Keyword.merge(defaults, opts))
+      {:ok, tx} = Transaction.deserialize(raw)
+      {:ok, cosigned} = Transaction.cosign_fee_payer(tx, @fee_payer_key, @fee_token_bin)
+      cosigned
+    end
+
+    test "sender/1 recovers the client sender from a co-signed transaction" do
+      {:ok, expected} = Curvy.get_address(@client_key)
+      assert {:ok, ^expected} = Transaction.sender(cosigned_transfer([]))
+    end
+
+    test "sender/1 errors on a transaction with too few fields" do
+      tx = %Transaction{chain_id: 1, calls: [%{to: <<0::160>>, value: 0, input: <<>>}], fields: [<<1>>], raw: "0x"}
+      assert {:error, "Transaction missing fields required to recover sender"} = Transaction.sender(tx)
+    end
+
+    test "sender/1 errors on an invalid sender signature" do
+      # build_tempo_tx uses a fake 64-byte sender signature, not a real 65-byte one.
+      hex = build_tempo_tx(calls: [build_call(@token_hex, transfer_calldata(@recipient_hex, 1))], fee_payer: true)
+      {:ok, tx} = Transaction.deserialize(hex)
+      assert {:error, msg} = Transaction.sender(tx)
+      assert msg =~ "Invalid sender signature format"
+    end
+
+    test "simulate_request/1 builds the TempoTransactionRequest wire object" do
+      {:ok, expected_from} = Curvy.get_address(@client_key)
+      {:ok, req} = Transaction.simulate_request(cosigned_transfer([]))
+
+      assert req["from"] == "0x" <> Base.encode16(expected_from, case: :lower)
+      assert req["to"] == String.downcase(@token_hex)
+      assert req["value"] == "0x0"
+      assert String.starts_with?(req["input"], "0x")
+      # Single-call tx: the only call is folded into to/input, leaving calls empty.
+      assert req["calls"] == []
+      assert req["gas"] == "0x186a0"
+      assert req["nonce"] == "0x7"
+      assert req["chainId"] == "0xa5bf"
+      assert req["type"] == "0x76"
+      assert req["feeToken"] == "0x" <> Base.encode16(@fee_token_bin, case: :lower)
+      # Zero fields are omitted, not encoded as "0x0".
+      refute Map.has_key?(req, "nonceKey")
+      refute Map.has_key?(req, "validBefore")
+    end
+
+    test "simulate_request/1 includes nonceKey and validBefore when non-zero" do
+      {:ok, req} = Transaction.simulate_request(cosigned_transfer(nonce_key: 3, valid_before: 99))
+      assert req["nonceKey"] == "0x3"
+      assert req["validBefore"] == "0x63"
+    end
+
+    test "simulate_request/1 folds the last call and keeps N-1 in calls for a multi-call tx" do
+      call1 = build_call(@token_hex, transfer_calldata(@recipient_hex, 1))
+      call2 = build_call(@other_token_hex, transfer_calldata(@recipient_hex, 2))
+
+      {:ok, raw} =
+        Builder.build_fee_payer_multicall(
+          private_key: @client_key,
+          calls: [call1, call2],
+          chain_id: @moderato_chain_id,
+          rpc_url: "http://localhost",
+          nonce: 0,
+          gas_limit: 100_000
+        )
+
+      {:ok, tx} = Transaction.deserialize(raw)
+      {:ok, cosigned} = Transaction.cosign_fee_payer(tx, @fee_payer_key, @fee_token_bin)
+      {:ok, req} = Transaction.simulate_request(cosigned)
+
+      assert [head] = req["calls"]
+      assert head["to"] == String.downcase(@token_hex)
+      assert req["to"] == String.downcase(@other_token_hex)
     end
   end
 end

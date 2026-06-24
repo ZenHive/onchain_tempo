@@ -43,7 +43,7 @@ OnchainTempo                       — Root module, Discoverable entry point
 Onchain.Tempo.TIP20                — TIP-20 selectors, calldata encoders, DEX address
 Onchain.Tempo.Transaction          — 0x76 struct, deserialize, payment matching, fee payer co-signing
 Onchain.Tempo.Transaction.Builder  — Build + sign 0x76 transactions from scratch
-Onchain.Tempo.RPC                  — broadcast_async/sync, fetch_receipt, parse_receipt
+Onchain.Tempo.RPC                  — broadcast_async/sync, fetch_receipt, parse_receipt, simulate (pre-broadcast eth_simulateV1)
 Onchain.Tempo.Transfer             — TransferWithMemo event log parsing
 Onchain.Tempo.Faucet               — Moderato testnet faucet (tempo_fundAddress) wrapper
 ```

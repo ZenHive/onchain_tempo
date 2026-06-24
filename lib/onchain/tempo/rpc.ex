@@ -21,6 +21,7 @@ defmodule Onchain.Tempo.RPC do
 
     * `:req_options` — keyword list passed to `Req.request/2` (timeouts, adapters, etc.)
   """
+  alias Onchain.Tempo.Transaction
   # Jason, Req are transitive deps via onchain — not resolved in PLT with path deps
   @dialyzer [:no_unknown]
 
@@ -82,6 +83,57 @@ defmodule Onchain.Tempo.RPC do
   end
 
   @doc """
+  Simulate a co-signed Tempo 0x76 transaction via `eth_simulateV1` before
+  broadcasting, so a fee payer can confirm the transaction would SUCCEED before
+  paying its gas.
+
+  Reconstructs a `TempoTransactionRequest` from the decoded envelope (recovering
+  the sender for `from` and folding the tail call into `to`/`input`), runs the
+  simulation against latest state with `validation: false` (no signature checks),
+  and reports the execution outcome:
+
+    * `{:ok, :success}` — the transaction would succeed (call status `0x1`)
+    * `{:ok, {:revert, detail}}` — the transaction would fail on-chain: either the
+      call status is `0x0` (revert / out-of-gas, the gas-draining DoS this guards
+      against) or the node rejected the transaction as invalid (an `eth_simulateV1`
+      execution error such as `-38013` "intrinsic gas too low"). `detail` carries
+      the node's error message / revert data. A fail-open caller MUST still reject
+      on this result — it means the transaction is bad, not the node.
+    * `{:ok, :unsupported}` — the node does not implement `eth_simulateV1`
+      (JSON-RPC error `-32601`); the caller decides whether to fail open or closed
+    * `{:error, reason}` — the transaction could not be decoded, or the RPC failed
+      for an operational reason (transport error, or a non-execution RPC error)
+
+  `raw_hex` is an already co-signed 0x76 transaction hex string.
+
+  > #### Method note {: .info}
+  > The Tempo node exposes the EVM-standard `eth_simulateV1` (AA-aware: it accepts
+  > the 0x76 `type`, `feeToken`, and the folded AA call). `tempo_simulateV1` —
+  > used by the mpp-rs reference — is not deployed on Tempo mainnet (4217) or
+  > Moderato testnet (42431); both return `-32601`. Verified empirically against
+  > both networks.
+  """
+  @spec simulate(String.t(), String.t(), keyword()) ::
+          {:ok, :success} | {:ok, {:revert, String.t()}} | {:ok, :unsupported} | {:error, String.t()}
+  def simulate(raw_hex, rpc_url, opts \\ []) do
+    with {:ok, tx} <- Transaction.deserialize(raw_hex),
+         {:ok, call_request} <- Transaction.simulate_request(tx) do
+      payload = %{
+        "blockStateCalls" => [%{"calls" => [call_request]}],
+        "traceTransfers" => false,
+        "validation" => false,
+        "returnFullTransactions" => false
+      }
+
+      case do_rpc_request("eth_simulateV1", [payload], rpc_url, opts) do
+        {:ok, result} -> interpret_simulation(result)
+        {:error, {:rpc_error, error}} -> classify_simulate_error(error)
+        {:error, {:transport, message}} -> {:error, message}
+      end
+    end
+  end
+
+  @doc """
   Parse a raw JSON-RPC receipt map into atom-keyed format.
 
   The output is compatible with `Onchain.Transfer.parse_logs/1` and
@@ -97,8 +149,19 @@ defmodule Onchain.Tempo.RPC do
 
   # --- Private ---
 
-  # Executes a JSON-RPC request via Req.
+  # Executes a JSON-RPC request via Req, flattening structured errors to strings
+  # for the broadcast/receipt callers.
   defp rpc_request(method, params, rpc_url, opts) do
+    case do_rpc_request(method, params, rpc_url, opts) do
+      {:ok, value} -> {:ok, value}
+      {:error, {:rpc_error, error}} -> {:error, "RPC error: #{inspect(error)}"}
+      {:error, {:transport, message}} -> {:error, message}
+    end
+  end
+
+  # Executes a JSON-RPC request and preserves the structured error so callers
+  # that need the JSON-RPC error code (e.g. -32601 method-not-found) can inspect it.
+  defp do_rpc_request(method, params, rpc_url, opts) do
     req_options = Keyword.get(opts, :req_options, [])
 
     body =
@@ -125,15 +188,73 @@ defmodule Onchain.Tempo.RPC do
         {:ok, value}
 
       {:ok, %Req.Response{body: %{"error" => error}}} ->
-        {:error, "RPC error: #{inspect(error)}"}
+        {:error, {:rpc_error, error}}
 
       {:error, exception} ->
-        {:error, "RPC request failed: #{Exception.message(exception)}"}
+        {:error, {:transport, "RPC request failed: #{Exception.message(exception)}"}}
 
       {:ok, %Req.Response{} = response} ->
-        {:error, "Unexpected RPC response (status #{response.status})"}
+        {:error, {:transport, "Unexpected RPC response (status #{response.status})"}}
     end
   end
+
+  # Reads the first block's first call result from an eth_simulateV1 response.
+  # `result` is a list of block results (eth_simulateV1); a map with a "blocks"
+  # key is also tolerated for forward-compatibility with other node shapes.
+  defp interpret_simulation(result) do
+    blocks = if is_list(result), do: result, else: Map.get(result, "blocks", [])
+
+    call =
+      case List.first(blocks) do
+        %{"calls" => [call | _]} -> call
+        _ -> nil
+      end
+
+    case call do
+      %{"status" => "0x1"} -> {:ok, :success}
+      %{"status" => "0x0"} -> {:ok, {:revert, revert_detail(call)}}
+      %{"status" => other} -> {:error, "Unexpected simulation status: #{inspect(other)}"}
+      nil -> {:error, "Simulation returned no call results"}
+      other -> {:error, "Malformed simulation call result: #{inspect(other)}"}
+    end
+  end
+
+  # Classifies a top-level JSON-RPC error from eth_simulateV1.
+  #   * -32601               → the method is not implemented (let the caller decide)
+  #   * -38000..-38999       → eth_simulateV1 execution/validity errors (e.g. -38013
+  #                            "intrinsic gas too low"): the transaction would fail,
+  #                            so report a revert (NOT an ambiguous error a fail-open
+  #                            caller could leak the DoS through)
+  #   * anything else        → operational RPC error
+  defp classify_simulate_error(%{"code" => -32_601}), do: {:ok, :unsupported}
+
+  defp classify_simulate_error(%{"code" => code} = error) when code <= -38_000 and code > -39_000 do
+    {:ok, {:revert, simulate_error_detail(error)}}
+  end
+
+  defp classify_simulate_error(error), do: {:error, "Simulation RPC error: #{inspect(error)}"}
+
+  defp simulate_error_detail(%{"message" => message, "code" => code}), do: "#{message} (code #{code})"
+  defp simulate_error_detail(error), do: inspect(error)
+
+  # Builds a human-readable revert reason from a failed simulation call result.
+  defp revert_detail(call) do
+    gas = gas_suffix(call["gasUsed"])
+
+    case call do
+      %{"error" => %{"message" => message} = error} ->
+        "#{message} (code #{error["code"]})" <> gas
+
+      %{"returnData" => data} when is_binary(data) and data not in ["", "0x"] ->
+        "revert data #{data}" <> gas
+
+      _ ->
+        "no revert reason returned" <> gas
+    end
+  end
+
+  defp gas_suffix(nil), do: ""
+  defp gas_suffix(gas) when is_binary(gas), do: " (gasUsed #{gas})"
 
   # Converts a raw JSON-RPC log entry to atom-keyed map.
   defp parse_log(log) do

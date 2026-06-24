@@ -1,7 +1,7 @@
 defmodule OnchainTempo.MixProject do
   use Mix.Project
 
-  @version "0.6.0"
+  @version "0.7.0"
   @source_url "https://github.com/ZenHive/onchain_tempo"
 
   def project do

@@ -261,11 +261,129 @@ defmodule Onchain.Tempo.Transaction do
     end
   end
 
+  # --- Simulation support ---
+
+  # 0x76 RLP field indices used to reconstruct a `tempo_simulateV1` call request.
+  @chain_id_index 0
+  @max_priority_fee_index 1
+  @max_fee_index 2
+  @gas_limit_index 3
+  @nonce_key_index 6
+  @nonce_index 7
+  @valid_before_index 8
+
+  # Field count of a full transaction without the optional key_authorization
+  # field (14 = 13 base fields + sender_signature).
+  @min_field_count_without_key_auth 14
+
+  @doc """
+  Recover the sender's 20-byte address from a parsed transaction.
+
+  Handles both self-signed and fee-payer co-signed transactions. For a
+  co-signed transaction the sender signed over placeholder `fee_token` (`<<>>`)
+  and `fee_payer_signature` (`<<0x00>>`) — the fee payer fills those in
+  afterward — so they are reset before the signing payload is reconstructed.
+
+  Returns `{:ok, address_binary}` or `{:error, reason}`.
+  """
+  @dialyzer {:nowarn_function, sender: 1}
+  @spec sender(t()) :: {:ok, binary()} | {:error, String.t()}
+  def sender(%__MODULE__{fields: fields}) when is_list(fields) and length(fields) >= @min_field_count_without_key_auth do
+    sender_sig_raw = List.last(fields)
+    base_fields = Enum.take(fields, length(fields) - 1)
+    signing_payload = <<@tempo_tx_type>> <> rlp_encode(reset_fee_payer_placeholders(base_fields))
+    recover_sender(signing_payload, sender_sig_raw)
+  end
+
+  def sender(_), do: {:error, "Transaction missing fields required to recover sender"}
+
+  @doc """
+  Build a `tempo_simulateV1` call request (a `TempoTransactionRequest`) from a
+  co-signed transaction.
+
+  Mirrors mpp-rs's `build_simulate_payload`: the recovered sender becomes `from`,
+  and the LAST sub-call is folded into `to`/`value`/`input` (so the node does not
+  read an empty `to` as a contract CREATE) while the remaining N-1 calls stay in
+  `calls`. All numeric fields are hex-quantity strings; `nonceKey` and
+  `validBefore` are omitted when zero.
+
+  The single-call wire format is integration-verified against Moderato; the
+  multi-call path mirrors the same per-call `{to, value, input}` shape.
+
+  Returns `{:ok, request_map}` or `{:error, reason}`.
+  """
+  @spec simulate_request(t()) :: {:ok, map()} | {:error, String.t()}
+  def simulate_request(%__MODULE__{calls: calls, fields: fields} = tx) do
+    with {:ok, sender_addr} <- sender(tx),
+         {:ok, {head_calls, tail}} <- pop_tail_call(calls) do
+      {:ok, build_simulate_request(sender_addr, head_calls, tail, fields)}
+    end
+  end
+
+  # --- Private: simulation helpers ---
+
+  # Resets the fee-token and fee-payer-signature positions to the placeholders
+  # the sender signed over, but only for a co-signed transaction (fee-payer
+  # signature is the decoded `[recid, r, s]` list). Self-signed transactions
+  # (fee-payer signature is `<<>>`) are left untouched.
+  defp reset_fee_payer_placeholders(base_fields) do
+    if is_list(Enum.at(base_fields, @fee_payer_sig_index)) do
+      base_fields
+      |> List.replace_at(@fee_token_index, <<>>)
+      |> List.replace_at(@fee_payer_sig_index, <<0x00>>)
+    else
+      base_fields
+    end
+  end
+
+  defp pop_tail_call([]), do: {:error, "Cannot simulate a transaction with no calls"}
+  defp pop_tail_call(calls), do: {:ok, {Enum.take(calls, length(calls) - 1), List.last(calls)}}
+
+  defp build_simulate_request(sender_addr, head_calls, tail, fields) do
+    %{
+      "from" => to_hex_data(sender_addr),
+      "to" => to_hex_data(tail.to),
+      "value" => to_hex_quantity(tail.value),
+      "input" => to_hex_data(tail.input),
+      "calls" => Enum.map(head_calls, &call_to_request/1),
+      "gas" => field_quantity(fields, @gas_limit_index),
+      "nonce" => field_quantity(fields, @nonce_index),
+      "maxFeePerGas" => field_quantity(fields, @max_fee_index),
+      "maxPriorityFeePerGas" => field_quantity(fields, @max_priority_fee_index),
+      "chainId" => field_quantity(fields, @chain_id_index),
+      "type" => "0x76",
+      "feeToken" => to_hex_data(field_bytes(fields, @fee_token_index))
+    }
+    |> maybe_put_quantity("nonceKey", field_int(fields, @nonce_key_index))
+    |> maybe_put_quantity("validBefore", field_int(fields, @valid_before_index))
+  end
+
+  defp call_to_request(%{to: to, value: value, input: input}) do
+    %{"to" => to_hex_data(to), "value" => to_hex_quantity(value), "input" => to_hex_data(input)}
+  end
+
+  defp field_bytes(fields, idx) do
+    case Enum.at(fields, idx) do
+      bin when is_binary(bin) -> bin
+      _ -> <<>>
+    end
+  end
+
+  defp field_int(fields, idx), do: decode_unsigned(field_bytes(fields, idx))
+  defp field_quantity(fields, idx), do: to_hex_quantity(field_int(fields, idx))
+
+  defp maybe_put_quantity(map, _key, 0), do: map
+  defp maybe_put_quantity(map, key, value), do: Map.put(map, key, to_hex_quantity(value))
+
+  defp to_hex_data(bin) when is_binary(bin), do: "0x" <> Base.encode16(bin, case: :lower)
+
+  defp to_hex_quantity(0), do: "0x0"
+  defp to_hex_quantity(n) when is_integer(n) and n > 0, do: "0x" <> String.downcase(Integer.to_string(n, 16))
+
   # --- Private: fee payer helpers ---
 
   # Splits the fields list into base fields (everything before sender_signature)
   # and a flag indicating if key_authorization is present.
-  @min_field_count_without_key_auth 14
   defp split_base_fields(fields) do
     total = length(fields)
     base = Enum.take(fields, total - 1)

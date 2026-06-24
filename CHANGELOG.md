@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.7.0
+
+### Pre-broadcast transaction simulation (closes a fee-payer gas-draining DoS)
+
+- **New public API:** `Onchain.Tempo.RPC.simulate/3` dry-runs a co-signed 0x76
+  transaction before broadcast so a fee payer can confirm it would SUCCEED before
+  paying its gas. Returns `{:ok, :success}`, `{:ok, {:revert, detail}}`,
+  `{:ok, :unsupported}`, or `{:error, reason}`. This closes the DoS where a
+  malicious client sets `gas_limit` just below what the call needs: the tx reverts
+  out-of-gas and the fee payer pays for nothing. Simulating the full envelope
+  (with the client's declared gas) pre-broadcast lets the sponsor reject it.
+- **New public API:** `Onchain.Tempo.Transaction.sender/1` recovers the sender's
+  20-byte address from a parsed transaction (handles fee-payer co-signed txs by
+  resetting the placeholder `fee_token`/`fee_payer_signature` the sender signed
+  over). `Onchain.Tempo.Transaction.simulate_request/1` reconstructs the
+  `eth_simulateV1` call request from the decoded envelope (recovered sender as
+  `from`; the tail call folded into `to`/`value`/`input`; the rest in `calls`).
+- **Method note:** simulation uses the EVM-standard **`eth_simulateV1`** (with
+  `validation: false`), which the Tempo node accepts for 0x76 AA transactions
+  (it honors `type`, `feeToken`, and the folded AA call). The `tempo_simulateV1`
+  method named by the mpp-rs reference is **not deployed** on Tempo mainnet (4217)
+  or Moderato testnet (42431) — both return `-32601` — verified empirically.
+  A top-level `eth_simulateV1` execution error (e.g. `-38013` "intrinsic gas too
+  low") is reported as `{:ok, {:revert, _}}` so a fail-open caller cannot leak the
+  DoS by mistaking an invalid transaction for a node problem.
+
 ## v0.6.0
 
 ### Faucet polls the fee-token balance
