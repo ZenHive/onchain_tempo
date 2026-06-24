@@ -263,7 +263,7 @@ defmodule Onchain.Tempo.Transaction do
 
   # --- Simulation support ---
 
-  # 0x76 RLP field indices used to reconstruct a `tempo_simulateV1` call request.
+  # 0x76 RLP field indices used to reconstruct an `eth_simulateV1` call request.
   @chain_id_index 0
   @max_priority_fee_index 1
   @max_fee_index 2
@@ -298,7 +298,7 @@ defmodule Onchain.Tempo.Transaction do
   def sender(_), do: {:error, "Transaction missing fields required to recover sender"}
 
   @doc """
-  Build a `tempo_simulateV1` call request (a `TempoTransactionRequest`) from a
+  Build an `eth_simulateV1` call request (a `TempoTransactionRequest`) from a
   co-signed transaction.
 
   Mirrors mpp-rs's `build_simulate_payload`: the recovered sender becomes `from`,

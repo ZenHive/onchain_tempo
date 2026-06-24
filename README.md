@@ -12,7 +12,7 @@ Built on [onchain](https://hex.pm/packages/onchain).
 ```elixir
 def deps do
   [
-    {:onchain_tempo, "~> 0.5"}
+    {:onchain_tempo, "~> 0.7"}
   ]
 end
 ```
@@ -26,7 +26,7 @@ Documentation: [hexdocs.pm/onchain_tempo](https://hexdocs.pm/onchain_tempo).
 | `Onchain.Tempo.TIP20` | TIP-20 function selectors, calldata encoders, Tempo constants |
 | `Onchain.Tempo.Transaction` | 0x76 transaction struct, deserialize, payment matching, fee payer co-signing |
 | `Onchain.Tempo.Transaction.Builder` | Build and sign 0x76 transactions from scratch |
-| `Onchain.Tempo.RPC` | Tempo JSON-RPC operations (broadcast async/sync, fetch receipt) |
+| `Onchain.Tempo.RPC` | Tempo JSON-RPC operations (broadcast async/sync, fetch receipt, pre-broadcast `eth_simulateV1`) |
 | `Onchain.Tempo.Transfer` | TransferWithMemo event log parsing |
 | `Onchain.Tempo.Faucet` | Moderato testnet faucet — `tempo_fundAddress` wrapper (testing only) |
 
