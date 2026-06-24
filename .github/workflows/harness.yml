@@ -65,7 +65,7 @@ jobs:
         run: mix doctor --raise
 
       - name: Sobelow (honors .sobelow-conf, exit=Low)
-        run: mix sobelow
+        run: mix sobelow --exit low
 
       # Coverage floor: 70% — main currently sits at ~74%; raise the floor as
       # coverage climbs. `mix test.json`'s test_helper excludes `:integration`

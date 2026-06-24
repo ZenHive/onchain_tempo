@@ -67,7 +67,11 @@ jobs:
 
       - name: Upload SARIF to code scanning
         uses: github/codeql-action/upload-sarif@v4
-        if: always()
+        # Upload whenever the SARIF was actually produced (the Sobelow step ran),
+        # but skip if an earlier deps/compile failure meant the file never existed
+        # — otherwise the upload adds a misleading secondary failure on top of the
+        # real one.
+        if: always() && hashFiles('sobelow.sarif') != ''
         with:
           sarif_file: sobelow.sarif
           category: sobelow
