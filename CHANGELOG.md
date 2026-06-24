@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.5.0
+
+### Dependency updates
+
+- Moved to the onchain-0.10 / cartouche-0.5 line: `onchain` `~> 0.9` → `~> 0.10`.
+  cartouche 0.5.0 dropped the `config :cartouche, :client` Finch transport seam and
+  onchain 0.10.0 migrated its HTTP transport to `Req`. No onchain_tempo library code
+  changed — single-call RPC (including `Onchain.RPC.eth_estimate_gas/2`) still flows
+  through `Cartouche.RPC.send_rpc/3`, now over `Req`.
+- **Test-only change:** `builder_estimate_test.exs` stubs the `eth_estimateGas`
+  transport via `config :cartouche, Cartouche.RPC, plug: ...` (the cartouche 0.5.0
+  `Req.Test` plug seam) instead of the removed `:cartouche, :client` toggle. All
+  offline tests green against the new line.
+
 ## v0.4.0
 
 ### Per-transaction gas estimation
