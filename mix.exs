@@ -38,7 +38,7 @@ defmodule OnchainTempo.MixProject do
 
   defp deps do
     [
-      {:onchain, "~> 0.9"},
+      {:onchain, "~> 0.10"},
       {:req, "~> 0.5"},
       {:jason, "~> 1.4"},
       {:descripex, "~> 0.9"},
